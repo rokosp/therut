@@ -45,6 +45,8 @@ export interface Course extends CourseInfo {
   id: string;
   name: string;
   club_name: string;
+  city?: string | null;
+  country?: string | null;
   course_tees: Tee[];
 }
 
@@ -261,6 +263,11 @@ export async function claimGuest(code: string): Promise<string> {
 export async function listCourses(): Promise<Course[]> {
   const rows = check(await supabase.from('courses').select('*, course_tees(*)').order('name'));
   return rows.map((c: Course) => ({ ...c, course_tees: [...c.course_tees].sort((a, b) => a.sort_order - b.sort_order) }));
+}
+
+/** Look a course up on GolfCourseAPI (through Supabase, which holds the key) and save what it finds. */
+export async function searchCoursesOnline(q: string): Promise<{ source: 'api' | 'saved'; found: number }> {
+  return check(await supabase.rpc('search_courses_online', { q }));
 }
 
 export function teeLabel(t: Tee): string {

@@ -12,6 +12,7 @@ import {
   type Member,
   holesFor,
   listCourses,
+  searchCoursesOnline,
   playingIndex,
   teeLabel,
 } from '@/lib/api';
@@ -36,7 +37,10 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   const [players, setPlayers] = useState<Record<string, string | null>>({}); // userId -> own tee (null = match tee)
   const { busy, error, run } = useAction();
 
-  const { data, error: loadError } = useLoad(async () => {
+  const [query, setQuery] = useState('');
+  const [onlineNote, setOnlineNote] = useState<string | null>(null);
+  const online = useAction();
+  const { data, error: loadError, reload } = useLoad(async () => {
     const [bundle, courses] = await Promise.all([leagueId ? getLeague(leagueId) : casualBundle(userId!), listCourses()]);
     const hcps = await handicapsFor(bundle.members.map((m) => m.user_id), courses);
     return { ...bundle, courses, hcps };
@@ -63,6 +67,15 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
 
   const { courses, members, settings, hcps } = data;
   const course = courses.find((c) => c.id === courseId) ?? null;
+  const q = query.trim().toLowerCase();
+  const matching = q
+    ? courses.filter((c) => [c.name, c.club_name, c.city ?? ''].some((x) => x.toLowerCase().includes(q)))
+    : courses;
+  // Keep the picked course visible, then the matches (a handful when nothing is typed).
+  const shownCourses = [
+    ...(course ? [course] : []),
+    ...matching.filter((c) => c.id !== courseId).slice(0, q ? 12 : 5),
+  ];
   const holes: 9 | 18 = kind === 'major' ? 18 : 9;
   const matchShape = { holes, nine: holes === 9 && course?.holes === 18 ? nine : null, course_id: courseId, tee_id: teeId };
 
@@ -147,12 +160,52 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
 
       <Card>
         <T variant="title">Course</T>
+        <Field
+          label="Search courses"
+          value={query}
+          onChangeText={(v) => {
+            setQuery(v);
+            setOnlineNote(null);
+          }}
+          placeholder="Course, club or city"
+        />
         <Row style={{ flexWrap: 'wrap' }}>
-          {courses.map((c) => (
-            <Chip key={c.id} label={c.name} on={c.id === courseId} onPress={() => pickCourse(c.id)} />
+          {shownCourses.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.city && !c.name.includes(c.city) ? `${c.name} · ${c.city}` : c.name}
+              on={c.id === courseId}
+              onPress={() => pickCourse(c.id)}
+            />
           ))}
         </Row>
-        {courses.length === 0 ? <T muted>No courses loaded yet.</T> : null}
+        {query.trim() && shownCourses.length === (course ? 1 : 0) ? <T muted>No saved course matches that.</T> : null}
+        {query.trim().length >= 3 ? (
+          <Button
+            title={`Search online for "${query.trim()}"`}
+            kind="secondary"
+            busy={online.busy}
+            onPress={() =>
+              online.run(async () => {
+                const r = await searchCoursesOnline(query);
+                await reload();
+                setOnlineNote(
+                  r.source === 'saved'
+                    ? 'Already searched recently, so the results are in the list above.'
+                    : r.found
+                      ? `Found ${r.found} course${r.found === 1 ? '' : 's'} online. They're saved now.`
+                      : 'Nothing found online. Try a shorter name, like the club or city.',
+                );
+              })
+            }
+          />
+        ) : null}
+        <ErrorText error={online.error} />
+        {onlineNote ? (
+          <T variant="label" muted>
+            {onlineNote}
+          </T>
+        ) : null}
         {course && holes === 9 && course.holes === 18 ? (
           <>
             <T variant="label" muted>
