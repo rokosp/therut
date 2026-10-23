@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, createElement, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
 /** Brand tokens from the brand book (brand-tokens.json). */
@@ -69,8 +71,45 @@ export const palettes: { light: Palette; dark: Palette } = {
   },
 };
 
+// Light / dark mode: follow the phone, or a choice saved on this device -------
+
+export type ThemePref = 'system' | 'light' | 'dark';
+const THEME_KEY = 'rut-theme';
+const ThemeContext = createContext<{ pref: ThemePref; setPref: (p: ThemePref) => void }>({
+  pref: 'system',
+  setPref: () => {},
+});
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [pref, setPrefState] = useState<ThemePref>('system');
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_KEY)
+      .then((v) => {
+        if (v === 'light' || v === 'dark') setPrefState(v);
+      })
+      .catch(() => {});
+  }, []);
+  const setPref = (p: ThemePref) => {
+    setPrefState(p);
+    AsyncStorage.setItem(THEME_KEY, p).catch(() => {});
+  };
+  return createElement(ThemeContext.Provider, { value: { pref, setPref } }, children);
+}
+
+export function useThemePref() {
+  return useContext(ThemeContext);
+}
+
+/** 'light' or 'dark', after the player's own choice. */
+export function useScheme(): 'light' | 'dark' {
+  const system = useColorScheme();
+  const { pref } = useContext(ThemeContext);
+  if (pref !== 'system') return pref;
+  return system === 'dark' ? 'dark' : 'light';
+}
+
 export function usePalette(): Palette {
-  return useColorScheme() === 'dark' ? palettes.dark : palettes.light;
+  return useScheme() === 'dark' ? palettes.dark : palettes.light;
 }
 
 export const fonts = {

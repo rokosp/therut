@@ -13,18 +13,19 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { BackButton } from '@/ui/BackButton';
 import { HeaderTitle } from '@/ui/components';
-import { usePalette } from '@/ui/theme';
+import { ThemeProvider, usePalette, useScheme } from '@/ui/theme';
 
 SplashScreen.preventAutoHideAsync();
 
 function RootStack() {
   const { session, ready } = useAuth();
   const c = usePalette();
-  const scheme = useColorScheme();
+  const scheme = useScheme();
   const [fontsLoaded] = useFonts({
     BigShouldersDisplay_800ExtraBold,
     BigShouldersDisplay_900Black,
@@ -49,6 +50,7 @@ function RootStack() {
           headerTintColor: c.text,
           headerTitle: ({ children }) => <HeaderTitle title={children} />,
           headerShadowVisible: false,
+          headerLeft: () => <BackButton />,
           contentStyle: { backgroundColor: c.bg },
         }}>
         <Stack.Protected guard={!session}>
@@ -97,9 +99,11 @@ function PhoneFrame({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     <PhoneFrame>
-      <AuthProvider>
-        <RootStack />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <RootStack />
+        </AuthProvider>
+      </ThemeProvider>
     </PhoneFrame>
   );
 }

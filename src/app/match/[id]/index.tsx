@@ -23,6 +23,7 @@ import { matchHappenings, type Happening } from '@/lib/stats';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
+import { Fireworks } from '@/ui/Fireworks';
 import { PlayerLink } from '@/ui/PlayerLink';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
@@ -36,6 +37,8 @@ export default function MatchScreen() {
   const pendingSaves = useRef(0);
   const lastEdit = useRef(0);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [celebrate, setCelebrate] = useState(false);
+  const [frame, setFrame] = useState<{ w: number; h: number } | null>(null);
   const action = useAction();
 
   const { data, error, loading, reload, setData } = useLoad(
@@ -144,470 +147,477 @@ export default function MatchScreen() {
   );
 
   return (
-    <Screen refreshing={loading} onRefresh={reload}>
-      <Stack.Screen options={{ title: 'Match' }} />
-      <View style={{ gap: space.s }}>
-        <Row style={{ flexWrap: 'wrap' }}>
-          <Tag kind={match.kind} label={`${match.kind} · ${match.holes}`} />
-          <Tag kind="final" label={isStableford ? 'Stableford' : 'Stroke play'} />
-          {match.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
-          {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
-        </Row>
-        <T variant="eyebrow" style={{ color: c.accentText }}>
-          {league ? leagueTitle(league) : 'Casual round'}
-        </T>
-        <T variant="display" style={{ fontSize: 40, lineHeight: 40 }}>
-          {course?.name ?? 'Match'}
-        </T>
-        <T muted>
-          {[
-            match.nine ? (match.nine === 'front' ? 'Front nine' : 'Back nine') : `${match.holes} holes`,
-            `Par ${played.par}`,
-            tee?.name,
-            formatDay(match.played_on),
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </T>
-      </View>
-      <ErrorText error={saveError ?? error} />
-      {casual && match.status === 'open' && match.join_code ? (
-        <Card
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-          <View style={{ flex: 1 }}>
-            <T variant="eyebrow" muted>
-              Match code
-            </T>
-            <T style={{ fontFamily: fonts.num, fontSize: 26, letterSpacing: 2 }}>{match.join_code}</T>
-          </View>
-          <T variant="label" muted style={{ flex: 1, textAlign: 'right' }}>
-            Friends enter this under Matches → Join a match.
+    <View
+      style={{ flex: 1 }}
+      onLayout={(e) => setFrame({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+      <Screen refreshing={loading} onRefresh={reload}>
+        <Stack.Screen options={{ title: 'Match' }} />
+        <View style={{ gap: space.s }}>
+          <Row style={{ flexWrap: 'wrap' }}>
+            <Tag kind={match.kind} label={`${match.kind} · ${match.holes}`} />
+            <Tag kind="final" label={isStableford ? 'Stableford' : 'Stroke play'} />
+            {match.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
+            {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
+          </Row>
+          <T variant="eyebrow" style={{ color: c.accentText }}>
+            {league ? leagueTitle(league) : 'Casual round'}
           </T>
-        </Card>
-      ) : null}
-      {locked ? (
-        <T variant="eyebrow" muted>
-          Season finished · scores are locked
-        </T>
-      ) : null}
-      {!editable && match.status === 'open' ? (
-        <T variant="eyebrow" style={{ color: c.danger }}>
-          ● Watching live · scores update on their own
-        </T>
-      ) : null}
-
-      {editable ? (
-        <Card>
-          <Segmented
-            options={[
-              { value: 'holes', label: 'Hole by hole' },
-              { value: 'totals', label: 'Totals only' },
-            ]}
-            value={mode}
-            onChange={setMode}
-          />
-          {mode === 'holes' ? (
-            <>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <Button title="‹" kind="secondary" compact disabled={hole === 0} onPress={() => setHole(hole - 1)} />
-                <View style={{ alignItems: 'center' }}>
-                  <T variant="eyebrow" muted>
-                    Hole
-                  </T>
-                  <T variant="score">{hole + 1 + holeOffset}</T>
-                  <T variant="label" muted>
-                    {parOf(hole) != null ? `Par ${parOf(hole)}` : 'Par –'}
-                    {played.strokeIndex ? ` · SI ${played.strokeIndex[hole]}` : ''}
-                  </T>
-                </View>
-                <Button
-                  title="›"
-                  kind="secondary"
-                  compact
-                  disabled={hole === played.holes - 1}
-                  onPress={() => setHole(hole + 1)}
-                />
-              </Row>
-              {match.match_players.map((p) => {
-                const value = p.hole_scores?.[hole] ?? null;
-                const par = parOf(hole) ?? 4;
-                return (
-                  <Row key={p.user_id} style={{ justifyContent: 'space-between', minHeight: 56 }}>
-                    <View style={{ flex: 1 }}>
-                      <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(p.user_id)}</T>
-                      {isStableford && value != null && parOf(hole) != null ? (
-                        <T variant="label" muted>
-                          {stablefordHole(value, parOf(hole)!)} pts
-                        </T>
-                      ) : null}
-                    </View>
-                    <Stepper
-                      value={value}
-                      par={parOf(hole)}
-                      onMinus={() => setHoleScore(p, value == null ? par : Math.max(1, value - 1))}
-                      onPlus={() => setHoleScore(p, value == null ? par : Math.min(15, value + 1))}
-                      onClear={() => setHoleScore(p, null)}
-                    />
-                  </Row>
-                );
-              })}
-              <T variant="label" muted>
-                Tap − or + to start at par. Long-press the score to clear it.
-              </T>
-            </>
-          ) : (
-            match.match_players.map((p) => (
-              <Field
-                key={p.user_id}
-                label={`${nameOf(p.user_id)} total`}
-                keyboardType="number-pad"
-                defaultValue={p.gross != null ? String(p.gross) : ''}
-                onEndEditing={(e) => {
-                  const n = parseInt(e.nativeEvent.text, 10);
-                  updatePlayer(p.user_id, {
-                    gross: Number.isNaN(n) ? null : n,
-                  });
-                }}
-              />
-            ))
-          )}
-        </Card>
-      ) : null}
-
-      {match.status === 'final' ? (
-        <>
-          <Section
-            title="Result"
-            right={
+          <T variant="display" style={{ fontSize: 40, lineHeight: 40 }}>
+            {course?.name ?? 'Match'}
+          </T>
+          <T muted>
+            {[
+              match.nine ? (match.nine === 'front' ? 'Front nine' : 'Back nine') : `${match.holes} holes`,
+              `Par ${played.par}`,
+              tee?.name,
+              formatDay(match.played_on),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </T>
+        </View>
+        <ErrorText error={saveError ?? error} />
+        {casual && match.status === 'open' && match.join_code ? (
+          <Card
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+            <View style={{ flex: 1 }}>
               <T variant="eyebrow" muted>
-                {isStableford ? 'Stableford' : 'Stroke play'}
+                Match code
               </T>
-            }
-          />
-          <View style={{ marginTop: -space.s }}>
-            {results.map((r) => {
-              const p = match.match_players.find((x) => x.user_id === r.userId)!;
-              const lead = r.position === 1 && r.score != null;
-              return (
-                <Row
-                  key={r.userId}
-                  style={{
-                    gap: space.m,
-                    paddingVertical: space.m,
-                    paddingHorizontal: space.m,
-                    borderRadius: lead ? radius.input : 0,
-                    backgroundColor: lead ? c.leader : undefined,
-                    borderBottomWidth: lead ? 0 : 1,
-                    borderColor: c.border,
-                  }}>
-                  <T
-                    style={{
-                      width: 28,
-                      textAlign: 'center',
-                      fontFamily: fonts.num,
-                      fontSize: 22,
-                      color: lead ? c.onLeader : c.text,
-                    }}>
-                    {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
-                  </T>
-                  <View style={{ flex: 1 }}>
-                    <PlayerLink id={r.userId}>
-                      <T
-                        style={{
-                          fontFamily: fonts.bodyBold,
-                          fontSize: 16,
-                          color: lead ? c.onLeader : c.text,
-                        }}>
-                        {nameOf(r.userId)}
-                      </T>
-                    </PlayerLink>
-                    <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
-                      {teeOf(p)?.name ?? ''}
-                      {showScores
-                        ? [
-                            isStableford && r.gross != null ? ` · ${r.gross} strokes` : '',
-                            !casual ? ` · +${r.total} league pts` : '',
-                            r.bonusPoints ? ` (${r.bonusPoints} bonus)` : '',
-                            r.gross == null ? ' · card not finished' : '',
-                          ].join('')
-                        : [
-                            isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : '',
-                            r.gross != null
-                              ? casual && !isStableford
-                                ? ''
-                                : ` · ${r.gross} strokes`
-                              : ' · card not finished',
-                            r.bonusPoints ? ` · +${r.bonusPoints} bonus` : '',
-                          ].join('')}
+              <T style={{ fontFamily: fonts.num, fontSize: 26, letterSpacing: 2 }}>{match.join_code}</T>
+            </View>
+            <T variant="label" muted style={{ flex: 1, textAlign: 'right' }}>
+              Friends enter this under Matches → Join a match.
+            </T>
+          </Card>
+        ) : null}
+        {locked ? (
+          <T variant="eyebrow" muted>
+            Season finished · scores are locked
+          </T>
+        ) : null}
+        {!editable && match.status === 'open' ? (
+          <T variant="eyebrow" style={{ color: c.danger }}>
+            ● Watching live · scores update on their own
+          </T>
+        ) : null}
+
+        {editable ? (
+          <Card>
+            <Segmented
+              options={[
+                { value: 'holes', label: 'Hole by hole' },
+                { value: 'totals', label: 'Totals only' },
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
+            {mode === 'holes' ? (
+              <>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Button title="‹" kind="secondary" compact disabled={hole === 0} onPress={() => setHole(hole - 1)} />
+                  <View style={{ alignItems: 'center' }}>
+                    <T variant="eyebrow" muted>
+                      Hole
+                    </T>
+                    <T variant="score">{hole + 1 + holeOffset}</T>
+                    <T variant="label" muted>
+                      {parOf(hole) != null ? `Par ${parOf(hole)}` : 'Par –'}
+                      {played.strokeIndex ? ` · SI ${played.strokeIndex[hole]}` : ''}
                     </T>
                   </View>
-                  <T
-                    style={{
-                      fontFamily: fonts.num,
-                      fontSize: 28,
-                      color: lead ? c.onLeader : c.text,
-                    }}>
-                    {casual || showScores ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
-                  </T>
+                  <Button
+                    title="›"
+                    kind="secondary"
+                    compact
+                    disabled={hole === played.holes - 1}
+                    onPress={() => setHole(hole + 1)}
+                  />
                 </Row>
-              );
-            })}
-          </View>
-          {results.some((r) => r.tiebreakNote) ? (
-            <T variant="label" muted>
-              Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
-            </T>
-          ) : null}
-          {scorecard}
-
-          {match.status === 'final' ? (
-            <Rundown
-              summary={rundownText(results, nameOf, isStableford, played.par)}
-              happenings={matchHappenings({
-                players: match.match_players.map((p) => ({
-                  userId: p.user_id,
-                  name: nameOf(p.user_id),
-                  holeScores: p.hole_scores,
-                })),
-                holePars: played.holePars,
-                holeOffset,
-              })}
-            />
-          ) : null}
-        </>
-      ) : (
-        <>
-          {scorecard}
-
-          {/* Live updates are for people watching; players in the match don't need the distraction. */}
-          {!isPlayer && match.status === 'open' ? (
-            <Commentary
-              lines={buildCommentary({
-                players: match.match_players.map((p) => ({
-                  userId: p.user_id,
-                  name: nameOf(p.user_id),
-                  holeScores: p.hole_scores,
-                  courseHandicap: p.course_handicap,
-                })),
-                holes: played.holes,
-                holePars: played.holePars,
-                strokeIndex: played.strokeIndex,
-                scoring: settings.scoring,
-                holeOffset,
-              })}
-              offset={holeOffset}
-            />
-          ) : null}
-
-          {myResult ? (
-            <Row
-              style={{
-                justifyContent: 'space-between',
-                alignItems: 'flex-end',
-              }}>
-              <View>
-                <T variant="eyebrow" muted>
-                  {isStableford ? 'Your Stableford' : 'Your strokes'}
+                {match.match_players.map((p) => {
+                  const value = p.hole_scores?.[hole] ?? null;
+                  const par = parOf(hole) ?? 4;
+                  return (
+                    <Row key={p.user_id} style={{ justifyContent: 'space-between', minHeight: 56 }}>
+                      <View style={{ flex: 1 }}>
+                        <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(p.user_id)}</T>
+                        {isStableford && value != null && parOf(hole) != null ? (
+                          <T variant="label" muted>
+                            {stablefordHole(value, parOf(hole)!)} pts
+                          </T>
+                        ) : null}
+                      </View>
+                      <Stepper
+                        value={value}
+                        par={parOf(hole)}
+                        onMinus={() => setHoleScore(p, value == null ? par : Math.max(1, value - 1))}
+                        onPlus={() => setHoleScore(p, value == null ? par : Math.min(15, value + 1))}
+                        onClear={() => setHoleScore(p, null)}
+                      />
+                    </Row>
+                  );
+                })}
+                <T variant="label" muted>
+                  Tap − or + to start at par. Long-press the score to clear it.
                 </T>
-                <T variant="score" style={{ fontSize: 56, lineHeight: 54 }}>
-                  {(isStableford ? myStableford : myResult.gross) ?? '–'}
-                </T>
-              </View>
-              {!casual ? (
-                <View style={{ alignItems: 'flex-end' }}>
-                  <T variant="eyebrow" muted>
-                    League points
-                  </T>
-                  <T
-                    variant="score"
-                    style={{
-                      fontSize: 56,
-                      lineHeight: 54,
-                      color: c.accentText,
-                    }}>
-                    +{myResult.total}
-                  </T>
-                </View>
-              ) : null}
-            </Row>
-          ) : null}
-
-          <Section
-            title="Standings so far"
-            right={
-              <T variant="eyebrow" muted>
-                {isStableford ? 'Stableford' : 'Stroke play'}
-              </T>
-            }
-          />
-          <View style={{ marginTop: -space.s }}>
-            {results.map((r) => {
-              const p = match.match_players.find((x) => x.user_id === r.userId)!;
-              const lead = r.position === 1 && r.score != null;
-              return (
-                <Row
-                  key={r.userId}
-                  style={{
-                    gap: space.m,
-                    paddingVertical: space.m,
-                    paddingHorizontal: space.m,
-                    borderRadius: lead ? radius.input : 0,
-                    backgroundColor: lead ? c.leader : undefined,
-                    borderBottomWidth: lead ? 0 : 1,
-                    borderColor: c.border,
-                  }}>
-                  <T
-                    style={{
-                      width: 28,
-                      textAlign: 'center',
-                      fontFamily: fonts.num,
-                      fontSize: 22,
-                      color: lead ? c.onLeader : c.text,
-                    }}>
-                    {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
-                  </T>
-                  <View style={{ flex: 1 }}>
-                    <PlayerLink id={r.userId}>
-                      <T
-                        style={{
-                          fontFamily: fonts.bodyBold,
-                          fontSize: 16,
-                          color: lead ? c.onLeader : c.text,
-                        }}>
-                        {nameOf(r.userId)}
-                      </T>
-                    </PlayerLink>
-                    <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
-                      {teeOf(p)?.name ?? ''}
-                      {showScores
-                        ? [
-                            isStableford && r.gross != null ? ` · ${r.gross} strokes` : '',
-                            !casual ? ` · +${r.total} league pts` : '',
-                            r.bonusPoints ? ` (${r.bonusPoints} bonus)` : '',
-                            r.gross == null ? ' · card not finished' : '',
-                          ].join('')
-                        : [
-                            isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : '',
-                            r.gross != null
-                              ? casual && !isStableford
-                                ? ''
-                                : ` · ${r.gross} strokes`
-                              : ' · card not finished',
-                            r.bonusPoints ? ` · +${r.bonusPoints} bonus` : '',
-                          ].join('')}
-                    </T>
-                  </View>
-                  <T
-                    style={{
-                      fontFamily: fonts.num,
-                      fontSize: 28,
-                      color: lead ? c.onLeader : c.text,
-                    }}>
-                    {casual || showScores ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
-                  </T>
-                </Row>
-              );
-            })}
-          </View>
-          {results.some((r) => r.tiebreakNote) ? (
-            <T variant="label" muted>
-              Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
-            </T>
-          ) : null}
-        </>
-      )}
-
-      {settings.tiebreak === 'playoff' &&
-      editable &&
-      (tied.length > 0 || match.match_players.some((p) => p.playoff_rank != null)) ? (
-        <Card>
-          <T variant="title">Playoff</T>
-          <T variant="label" muted>
-            Enter the playoff finishing order for tied players (1 = winner).
-          </T>
-          {match.match_players
-            .filter((p) => tied.some((t) => t.userId === p.user_id) || p.playoff_rank != null)
-            .map((p) => (
-              <Row key={p.user_id} style={{ justifyContent: 'space-between' }}>
-                <T>{nameOf(p.user_id)}</T>
-                <TextInput
+              </>
+            ) : (
+              match.match_players.map((p) => (
+                <Field
+                  key={p.user_id}
+                  label={`${nameOf(p.user_id)} total`}
                   keyboardType="number-pad"
-                  defaultValue={p.playoff_rank != null ? String(p.playoff_rank) : ''}
+                  defaultValue={p.gross != null ? String(p.gross) : ''}
                   onEndEditing={(e) => {
                     const n = parseInt(e.nativeEvent.text, 10);
                     updatePlayer(p.user_id, {
-                      playoff_rank: Number.isNaN(n) ? null : n,
+                      gross: Number.isNaN(n) ? null : n,
                     });
                   }}
-                  style={{
-                    width: 64,
-                    minHeight: 44,
-                    borderWidth: 1,
-                    borderColor: c.border,
-                    borderRadius: radius.small,
-                    color: c.text,
-                    textAlign: 'center',
-                    fontFamily: fonts.mono,
-                  }}
                 />
-              </Row>
-            ))}
-        </Card>
-      ) : null}
+              ))
+            )}
+          </Card>
+        ) : null}
 
-      {casual ? null : (
-        <Bonuses
-          editable={editable}
-          canRemove={(createdBy) => isAdmin || createdBy === userId}
-          bonuses={match.bonus_awards}
-          players={match.match_players.map((p) => ({
-            id: p.user_id,
-            name: nameOf(p.user_id),
-          }))}
-          types={settings.bonusTypes}
-          maxHole={played.holes + holeOffset}
-          onAdd={(b) => action.run(async () => (await addBonus({ matchId: match.id, ...b }), await reload()))}
-          onRemove={(bid) => action.run(async () => (await removeBonus(bid), await reload()))}
-        />
-      )}
+        {match.status === 'final' ? (
+          <>
+            <Section
+              title="Result"
+              right={
+                <T variant="eyebrow" muted>
+                  {isStableford ? 'Stableford' : 'Stroke play'}
+                </T>
+              }
+            />
+            <View style={{ marginTop: -space.s }}>
+              {results.map((r) => {
+                const p = match.match_players.find((x) => x.user_id === r.userId)!;
+                const lead = r.position === 1 && r.score != null;
+                return (
+                  <Row
+                    key={r.userId}
+                    style={{
+                      gap: space.m,
+                      paddingVertical: space.m,
+                      paddingHorizontal: space.m,
+                      borderRadius: lead ? radius.input : 0,
+                      backgroundColor: lead ? c.leader : undefined,
+                      borderBottomWidth: lead ? 0 : 1,
+                      borderColor: c.border,
+                    }}>
+                    <T
+                      style={{
+                        width: 28,
+                        textAlign: 'center',
+                        fontFamily: fonts.num,
+                        fontSize: 22,
+                        color: lead ? c.onLeader : c.text,
+                      }}>
+                      {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
+                    </T>
+                    <View style={{ flex: 1 }}>
+                      <PlayerLink id={r.userId}>
+                        <T
+                          style={{
+                            fontFamily: fonts.bodyBold,
+                            fontSize: 16,
+                            color: lead ? c.onLeader : c.text,
+                          }}>
+                          {nameOf(r.userId)}
+                        </T>
+                      </PlayerLink>
+                      <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
+                        {teeOf(p)?.name ?? ''}
+                        {showScores
+                          ? [
+                              isStableford && r.gross != null ? ` · ${r.gross} strokes` : '',
+                              !casual ? ` · +${r.total} league pts` : '',
+                              r.bonusPoints ? ` (${r.bonusPoints} bonus)` : '',
+                              r.gross == null ? ' · card not finished' : '',
+                            ].join('')
+                          : [
+                              isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : '',
+                              r.gross != null
+                                ? casual && !isStableford
+                                  ? ''
+                                  : ` · ${r.gross} strokes`
+                                : ' · card not finished',
+                              r.bonusPoints ? ` · +${r.bonusPoints} bonus` : '',
+                            ].join('')}
+                      </T>
+                    </View>
+                    <T
+                      style={{
+                        fontFamily: fonts.num,
+                        fontSize: 28,
+                        color: lead ? c.onLeader : c.text,
+                      }}>
+                      {casual || showScores ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
+                    </T>
+                  </Row>
+                );
+              })}
+            </View>
+            {results.some((r) => r.tiebreakNote) ? (
+              <T variant="label" muted>
+                Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
+              </T>
+            ) : null}
+            {scorecard}
 
-      <ErrorText error={action.error} />
-      {canManage ? (
-        match.status === 'open' ? (
-          <Button
-            title="Finish match"
-            onPress={() =>
-              action.run(async () => {
-                await setMatchStatus(match.id, 'final');
-                await reload();
-              })
-            }
-            busy={action.busy}
-          />
+            {match.status === 'final' ? (
+              <Rundown
+                summary={rundownText(results, nameOf, isStableford, played.par)}
+                happenings={matchHappenings({
+                  players: match.match_players.map((p) => ({
+                    userId: p.user_id,
+                    name: nameOf(p.user_id),
+                    holeScores: p.hole_scores,
+                  })),
+                  holePars: played.holePars,
+                  holeOffset,
+                })}
+              />
+            ) : null}
+          </>
         ) : (
-          <Button
-            title="Reopen for edits"
-            kind="secondary"
-            onPress={() =>
-              action.run(async () => {
-                await setMatchStatus(match.id, 'open');
-                await reload();
-              })
-            }
+          <>
+            {scorecard}
+
+            {/* Live updates are for people watching; players in the match don't need the distraction. */}
+            {!isPlayer && match.status === 'open' ? (
+              <Commentary
+                lines={buildCommentary({
+                  players: match.match_players.map((p) => ({
+                    userId: p.user_id,
+                    name: nameOf(p.user_id),
+                    holeScores: p.hole_scores,
+                    courseHandicap: p.course_handicap,
+                  })),
+                  holes: played.holes,
+                  holePars: played.holePars,
+                  strokeIndex: played.strokeIndex,
+                  scoring: settings.scoring,
+                  holeOffset,
+                })}
+                offset={holeOffset}
+              />
+            ) : null}
+
+            {myResult ? (
+              <Row
+                style={{
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-end',
+                }}>
+                <View>
+                  <T variant="eyebrow" muted>
+                    {isStableford ? 'Your Stableford' : 'Your strokes'}
+                  </T>
+                  <T variant="score" style={{ fontSize: 56, lineHeight: 54 }}>
+                    {(isStableford ? myStableford : myResult.gross) ?? '–'}
+                  </T>
+                </View>
+                {!casual ? (
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <T variant="eyebrow" muted>
+                      League points
+                    </T>
+                    <T
+                      variant="score"
+                      style={{
+                        fontSize: 56,
+                        lineHeight: 54,
+                        color: c.accentText,
+                      }}>
+                      +{myResult.total}
+                    </T>
+                  </View>
+                ) : null}
+              </Row>
+            ) : null}
+
+            <Section
+              title="Standings so far"
+              right={
+                <T variant="eyebrow" muted>
+                  {isStableford ? 'Stableford' : 'Stroke play'}
+                </T>
+              }
+            />
+            <View style={{ marginTop: -space.s }}>
+              {results.map((r) => {
+                const p = match.match_players.find((x) => x.user_id === r.userId)!;
+                const lead = r.position === 1 && r.score != null;
+                return (
+                  <Row
+                    key={r.userId}
+                    style={{
+                      gap: space.m,
+                      paddingVertical: space.m,
+                      paddingHorizontal: space.m,
+                      borderRadius: lead ? radius.input : 0,
+                      backgroundColor: lead ? c.leader : undefined,
+                      borderBottomWidth: lead ? 0 : 1,
+                      borderColor: c.border,
+                    }}>
+                    <T
+                      style={{
+                        width: 28,
+                        textAlign: 'center',
+                        fontFamily: fonts.num,
+                        fontSize: 22,
+                        color: lead ? c.onLeader : c.text,
+                      }}>
+                      {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
+                    </T>
+                    <View style={{ flex: 1 }}>
+                      <PlayerLink id={r.userId}>
+                        <T
+                          style={{
+                            fontFamily: fonts.bodyBold,
+                            fontSize: 16,
+                            color: lead ? c.onLeader : c.text,
+                          }}>
+                          {nameOf(r.userId)}
+                        </T>
+                      </PlayerLink>
+                      <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
+                        {teeOf(p)?.name ?? ''}
+                        {showScores
+                          ? [
+                              isStableford && r.gross != null ? ` · ${r.gross} strokes` : '',
+                              !casual ? ` · +${r.total} league pts` : '',
+                              r.bonusPoints ? ` (${r.bonusPoints} bonus)` : '',
+                              r.gross == null ? ' · card not finished' : '',
+                            ].join('')
+                          : [
+                              isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : '',
+                              r.gross != null
+                                ? casual && !isStableford
+                                  ? ''
+                                  : ` · ${r.gross} strokes`
+                                : ' · card not finished',
+                              r.bonusPoints ? ` · +${r.bonusPoints} bonus` : '',
+                            ].join('')}
+                      </T>
+                    </View>
+                    <T
+                      style={{
+                        fontFamily: fonts.num,
+                        fontSize: 28,
+                        color: lead ? c.onLeader : c.text,
+                      }}>
+                      {casual || showScores ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
+                    </T>
+                  </Row>
+                );
+              })}
+            </View>
+            {results.some((r) => r.tiebreakNote) ? (
+              <T variant="label" muted>
+                Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
+              </T>
+            ) : null}
+          </>
+        )}
+
+        {settings.tiebreak === 'playoff' &&
+        editable &&
+        (tied.length > 0 || match.match_players.some((p) => p.playoff_rank != null)) ? (
+          <Card>
+            <T variant="title">Playoff</T>
+            <T variant="label" muted>
+              Enter the playoff finishing order for tied players (1 = winner).
+            </T>
+            {match.match_players
+              .filter((p) => tied.some((t) => t.userId === p.user_id) || p.playoff_rank != null)
+              .map((p) => (
+                <Row key={p.user_id} style={{ justifyContent: 'space-between' }}>
+                  <T>{nameOf(p.user_id)}</T>
+                  <TextInput
+                    keyboardType="number-pad"
+                    defaultValue={p.playoff_rank != null ? String(p.playoff_rank) : ''}
+                    onEndEditing={(e) => {
+                      const n = parseInt(e.nativeEvent.text, 10);
+                      updatePlayer(p.user_id, {
+                        playoff_rank: Number.isNaN(n) ? null : n,
+                      });
+                    }}
+                    style={{
+                      width: 64,
+                      minHeight: 44,
+                      borderWidth: 1,
+                      borderColor: c.border,
+                      borderRadius: radius.small,
+                      color: c.text,
+                      textAlign: 'center',
+                      fontFamily: fonts.mono,
+                    }}
+                  />
+                </Row>
+              ))}
+          </Card>
+        ) : null}
+
+        {casual ? null : (
+          <Bonuses
+            editable={editable}
+            canRemove={(createdBy) => isAdmin || createdBy === userId}
+            bonuses={match.bonus_awards}
+            players={match.match_players.map((p) => ({
+              id: p.user_id,
+              name: nameOf(p.user_id),
+            }))}
+            types={settings.bonusTypes}
+            maxHole={played.holes + holeOffset}
+            onAdd={(b) => action.run(async () => (await addBonus({ matchId: match.id, ...b }), await reload()))}
+            onRemove={(bid) => action.run(async () => (await removeBonus(bid), await reload()))}
           />
-        )
-      ) : null}
-      {match.status === 'open' && !casual ? (
-        <T variant="label" muted>
-          Points count in the league table once the match is finished.
-        </T>
-      ) : null}
-      {canManage ? <Button title="Delete match" kind="danger" onPress={confirmDelete} /> : null}
-    </Screen>
+        )}
+
+        <ErrorText error={action.error} />
+        {canManage ? (
+          match.status === 'open' ? (
+            <Button
+              title="Finish match"
+              onPress={() =>
+                action.run(async () => {
+                  await setMatchStatus(match.id, 'final');
+                  await reload();
+                  setCelebrate(true);
+                })
+              }
+              busy={action.busy}
+            />
+          ) : (
+            <Button
+              title="Reopen for edits"
+              kind="secondary"
+              onPress={() =>
+                action.run(async () => {
+                  await setMatchStatus(match.id, 'open');
+                  await reload();
+                })
+              }
+            />
+          )
+        ) : null}
+        {match.status === 'open' && !casual ? (
+          <T variant="label" muted>
+            Points count in the league table once the match is finished.
+          </T>
+        ) : null}
+        {canManage ? <Button title="Delete match" kind="danger" onPress={confirmDelete} /> : null}
+      </Screen>
+      {/* Fireworks over the whole screen when the match has just been finished. */}
+      {celebrate && frame ? <Fireworks width={frame.w} height={frame.h * 0.7} bursts={6} /> : null}
+    </View>
   );
 }
 

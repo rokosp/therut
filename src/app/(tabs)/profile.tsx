@@ -3,18 +3,28 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
-import { claimGuest, displayName, uploadAvatar, getProfile, handicapsFor, listCourses, playerStats, updateProfile } from '@/lib/api';
+import {
+  claimGuest,
+  displayName,
+  uploadAvatar,
+  getProfile,
+  handicapsFor,
+  listCourses,
+  playerStats,
+  updateProfile,
+} from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useAction, useLoad } from '@/lib/useLoad';
-import { Avatar, Button, Card, ErrorText, Field, Row, Screen, Section, T } from '@/ui/components';
+import { Avatar, Button, Card, ErrorText, Field, Row, Screen, Section, T, Segmented } from '@/ui/components';
 import { Friends } from '@/ui/Friends';
 import { CareerHighlights, HcpCards, StatsRow } from '@/ui/PlayerBits';
-import { fonts, radius, space, usePalette } from '@/ui/theme';
+import { fonts, radius, space, usePalette, useThemePref } from '@/ui/theme';
 
 export default function ProfileScreen() {
   const { userId } = useAuth();
   const c = usePalette();
+  const theme = useThemePref();
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [selfHcp, setSelfHcp] = useState('');
@@ -239,6 +249,22 @@ export default function ProfileScreen() {
           ) : null}
         </Card>
       ) : null}
+
+      <Card>
+        <T variant="h2">Appearance</T>
+        <Segmented
+          options={[
+            { value: 'system', label: 'Auto' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+          value={theme.pref}
+          onChange={theme.setPref}
+        />
+        <T variant="label" muted>
+          Auto follows your phone's setting.
+        </T>
+      </Card>
 
       <Button title="Sign out" kind="danger" onPress={() => supabase.auth.signOut()} />
     </Screen>

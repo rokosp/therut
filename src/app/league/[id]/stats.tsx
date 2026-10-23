@@ -13,7 +13,8 @@ import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 /** Season podium plus fun awards from every finished card in the league. */
 export default function SeasonStats() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // Fireworks only right after the season is finished (the league page sends celebrate=1).
+  const { id, celebrate } = useLocalSearchParams<{ id: string; celebrate?: string }>();
   const c = usePalette();
   const [box, setBox] = useState<{ w: number; h: number } | null>(null);
   const { data, error, loading, reload } = useLoad(async () => {
@@ -136,7 +137,7 @@ export default function SeasonStats() {
             })}
           </Row>
         )}
-        {box && top.length ? <Fireworks width={box.w} height={box.h} /> : null}
+        {box && top.length && celebrate === '1' ? <Fireworks width={box.w} height={box.h} /> : null}
       </View>
 
       {table.length > 3 ? (

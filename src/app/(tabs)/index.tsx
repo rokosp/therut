@@ -1,17 +1,17 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, useColorScheme, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { handicapsFor, listCourses, listLeagues, syncMyHandicap } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
-import { brand, fonts, space, usePalette } from '@/ui/theme';
+import { brand, fonts, space, usePalette, useScheme } from '@/ui/theme';
 
 export default function Home() {
   const { userId } = useAuth();
   const c = usePalette();
-  const dark = useColorScheme() === 'dark';
+  const dark = useScheme() === 'dark';
   const [showPast, setShowPast] = useState(false);
   const { data: leagues, error, loading, reload } = useLoad(async () => {
     const leagues = await listLeagues();

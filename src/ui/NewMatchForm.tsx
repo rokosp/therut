@@ -9,6 +9,7 @@ import {
   getProfiles,
   handicapsFor,
   listFriendships,
+  type Course,
   type Member,
   holesFor,
   listCourses,
@@ -22,6 +23,12 @@ import { withDefaults, type MatchFormat, type MatchKind } from '@/lib/types';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Segmented, T } from '@/ui/components';
 import { space } from '@/ui/theme';
+
+/** One tee per colour: the ladies' ratings stay saved, but the picker only shows the main set. */
+const teesOf = (c: Course) => {
+  const main = c.course_tees.filter((t) => !t.name.includes('Ladies'));
+  return main.length ? main : c.course_tees;
+};
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -51,7 +58,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
     if (!data) return;
     if (!courseId && data.courses[0]) {
       setCourseId(data.courses[0].id);
-      setTeeId(data.courses[0].course_tees[0]?.id ?? null);
+      setTeeId(teesOf(data.courses[0])[0]?.id ?? null);
     }
     if (userId && Object.keys(players).length === 0) setPlayers({ [userId]: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,7 +97,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   const pickCourse = (cid: string) => {
     const c = courses.find((x) => x.id === cid);
     setCourseId(cid);
-    setTeeId(c?.course_tees[0]?.id ?? null);
+    setTeeId((c ? teesOf(c)[0]?.id : null) ?? null);
     // Player tee choices belong to the old course.
     setPlayers(Object.fromEntries(Object.keys(players).map((k) => [k, null])));
   };
@@ -227,7 +234,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
               Tees (default for everyone)
             </T>
             <Row style={{ flexWrap: 'wrap' }}>
-              {course.course_tees.map((t) => (
+              {teesOf(course).map((t) => (
                 <Chip key={t.id} label={teeLabel(t)} on={t.id === teeId} onPress={() => setTeeId(t.id)} />
               ))}
             </Row>
@@ -264,13 +271,13 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
               <T variant="title">{displayName(m?.profiles)}</T>
               <T variant="mono">{idx == null ? 'No HCP' : `HCP ${idx.toFixed(1)}`}</T>
             </Row>
-            {course && course.course_tees.length > 1 ? (
+            {course && teesOf(course).length > 1 ? (
               <View style={{ gap: space.xs }}>
                 <T variant="label" muted>
                   Plays from
                 </T>
                 <Row style={{ flexWrap: 'wrap' }}>
-                  {course.course_tees.map((t) => (
+                  {teesOf(course).map((t) => (
                     <Chip
                       key={t.id}
                       label={t.name}

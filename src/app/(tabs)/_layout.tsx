@@ -5,6 +5,7 @@ import { Pressable } from 'react-native';
 import { getProfile, listFriendships } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
+import { BackButton } from '@/ui/BackButton';
 import { Avatar, HeaderTitle } from '@/ui/components';
 import { fonts, usePalette } from '@/ui/theme';
 
@@ -44,7 +45,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'The Rut',
-          tabBarLabel: 'League',
+          tabBarLabel: 'Leagues',
           headerRight: () => (
             <Pressable onPress={() => router.navigate('/profile')} hitSlop={12} style={{ marginRight: 16 }}>
               <Avatar name={name} url={me?.avatar} />
@@ -52,10 +53,17 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="matches" options={{ title: 'Matches', tabBarLabel: 'Matches' }} />
+      <Tabs.Screen
+        name="matches"
+        options={{ title: 'Matches', tabBarLabel: 'Matches', headerLeft: () => <BackButton home /> }}
+      />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profile', tabBarLabel: requests ? `Profile · ${requests}` : 'Profile' }}
+        options={{
+          title: 'Profile',
+          tabBarLabel: requests ? `Profile · ${requests}` : 'Profile',
+          headerLeft: () => <BackButton home />,
+        }}
       />
     </Tabs>
   );

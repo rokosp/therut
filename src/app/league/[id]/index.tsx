@@ -46,7 +46,7 @@ export default function LeagueScreen() {
         finishing.run(async () => {
           await finishSeason(league.id);
           await reload();
-          router.push(`/league/${league.id}/stats`);
+          router.push(`/league/${league.id}/stats?celebrate=1`);
         }),
     );
   const nameOf = (uid: string) => displayName(members.find((m) => m.user_id === uid)?.profiles);

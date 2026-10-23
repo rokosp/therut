@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useColorScheme,
   View,
   type TextInputProps,
   type TextProps,
@@ -16,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fonts, radius, space, touch, type, usePalette } from './theme';
+import { fonts, radius, space, touch, type, usePalette, useScheme } from './theme';
 
 export function Screen({
   children,
@@ -227,7 +226,7 @@ export function Chip({ label, on, onPress }: { label: string; on?: boolean; onPr
 /** Match tags: Major filled pine, Minor outlined, Bonus blaze, Live red. */
 export function Tag({ kind, label }: { kind: 'major' | 'minor' | 'bonus' | 'live' | 'final'; label: string }) {
   const c = usePalette();
-  const dark = useColorScheme() === 'dark';
+  const dark = useScheme() === 'dark';
   const pine = dark ? c.text : c.head;
   const look = {
     major: { bg: dark ? c.text : c.head, fg: c.bg, border: 'transparent' },
@@ -277,7 +276,7 @@ export function Avatar({ name, size = 28, url }: { name: string; size?: number; 
 /** The deer mark next to a screen title, like the brand book's app bar. */
 export function HeaderTitle({ title }: { title: string }) {
   const c = usePalette();
-  const dark = useColorScheme() === 'dark';
+  const dark = useScheme() === 'dark';
   return (
     <Row style={{ gap: space.s }}>
       <Image

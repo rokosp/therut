@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
 import { isConfigured, supabase } from '@/lib/supabase';
 import { useAction } from '@/lib/useLoad';
 import { Button, ErrorText, Field, Screen, Segmented, T } from '@/ui/components';
-import { brand, space, usePalette } from '@/ui/theme';
+import { brand, space, usePalette, useScheme } from '@/ui/theme';
 
 export default function SignIn() {
   const c = usePalette();
-  const scheme = useColorScheme();
+  const scheme = useScheme();
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
