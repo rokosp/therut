@@ -2,7 +2,15 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
-import { deleteLeague, displayName, getLeague, removeMember, setMemberRole, updateLeague } from '@/lib/api';
+import {
+  addGuestPlayer,
+  deleteLeague,
+  displayName,
+  getLeague,
+  removeMember,
+  setMemberRole,
+  updateLeague,
+} from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { BonusType, LeagueSettings } from '@/lib/types';
 import { useAction, useLoad } from '@/lib/useLoad';
@@ -30,6 +38,7 @@ export default function LeagueSettingsScreen() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const save = useAction();
   const memberAction = useAction();
+  const [guestName, setGuestName] = useState('');
 
   const { data, error, reload } = useLoad(async () => {
     const b = await getLeague(id);
@@ -146,7 +155,8 @@ export default function LeagueSettingsScreen() {
         <T variant="label" muted>
           {
             {
-              countback: 'Best last 9, then last 6, 3 and last hole (last 6, 3, 1 on a 9-hole match). Needs hole-by-hole scores, otherwise points are split.',
+              countback:
+                'Best last 9, then last 6, 3 and last hole (last 6, 3, 1 on a 9-hole match). Needs hole-by-hole scores, otherwise points are split.',
               playoff: 'You enter who won the playoff on the match screen. Until then, points are split.',
               split: 'Tied players share the points for the places they cover.',
             }[draft.tiebreak]
@@ -163,7 +173,9 @@ export default function LeagueSettingsScreen() {
           <Row key={b.key}>
             <TextInput
               value={b.label}
-              onChangeText={(v) => set({ bonusTypes: draft.bonusTypes.map((x, j) => (j === i ? { ...x, label: v } : x)) })}
+              onChangeText={(v) =>
+                set({ bonusTypes: draft.bonusTypes.map((x, j) => (j === i ? { ...x, label: v } : x)) })
+              }
               style={[styles.text, input]}
               placeholder="Name"
               placeholderTextColor={c.muted}
@@ -171,7 +183,9 @@ export default function LeagueSettingsScreen() {
             <TextInput
               value={b.points}
               keyboardType="numbers-and-punctuation"
-              onChangeText={(v) => set({ bonusTypes: draft.bonusTypes.map((x, j) => (j === i ? { ...x, points: v } : x)) })}
+              onChangeText={(v) =>
+                set({ bonusTypes: draft.bonusTypes.map((x, j) => (j === i ? { ...x, points: v } : x)) })
+              }
               style={[styles.num, input]}
             />
             <Button
@@ -201,6 +215,7 @@ export default function LeagueSettingsScreen() {
           <Row key={m.user_id} style={{ justifyContent: 'space-between' }}>
             <T style={{ flex: 1 }}>
               {displayName(m.profiles)} {m.role === 'admin' ? '(admin)' : ''}
+              {m.profiles.is_guest ? ' (guest)' : ''}
             </T>
             {m.user_id !== userId ? (
               <Row>
@@ -225,6 +240,27 @@ export default function LeagueSettingsScreen() {
             ) : null}
           </Row>
         ))}
+        <T variant="label" muted style={{ marginTop: space.s }}>
+          Add a friend who doesn't have an account yet. Open their player page later to get the code they use to claim
+          their scores.
+        </T>
+        <Row style={{ alignItems: 'flex-end' }}>
+          <View style={{ flex: 1 }}>
+            <Field label="Guest player name" value={guestName} onChangeText={setGuestName} placeholder="e.g. Marko" />
+          </View>
+          <Button
+            title="Add"
+            kind="secondary"
+            disabled={!guestName.trim()}
+            onPress={() =>
+              memberAction.run(async () => {
+                await addGuestPlayer(id, guestName.trim());
+                setGuestName('');
+                reload();
+              })
+            }
+          />
+        </Row>
       </Card>
 
       <Card>
@@ -268,7 +304,13 @@ function PointsEditor({
         </Row>
       ))}
       <Row>
-        <Button title="Add place" kind="secondary" compact style={{ flex: 1 }} onPress={() => onChange([...values, '0'])} />
+        <Button
+          title="Add place"
+          kind="secondary"
+          compact
+          style={{ flex: 1 }}
+          onPress={() => onChange([...values, '0'])}
+        />
         <Button
           title="Remove last"
           kind="secondary"

@@ -1,10 +1,12 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { displayName, getLeague, holesFor, listCourses, resultsFor } from '@/lib/api';
 import { buildStandings } from '@/lib/standings';
 import { seasonAwards, type SeasonCard } from '@/lib/stats';
 import { useLoad } from '@/lib/useLoad';
+import { Fireworks } from '@/ui/Fireworks';
 import { Avatar, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
@@ -12,6 +14,7 @@ import { fonts, radius, space, usePalette } from '@/ui/theme';
 export default function SeasonStats() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = usePalette();
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
   const { data, error, loading, reload } = useLoad(async () => {
     const [bundle, courses] = await Promise.all([getLeague(id), listCourses()]);
     return { ...bundle, courses };
@@ -62,65 +65,74 @@ export default function SeasonStats() {
   return (
     <Screen refreshing={loading} onRefresh={reload}>
       <Stack.Screen options={{ title: 'Season stats' }} />
-      <View>
-        <T variant="eyebrow" muted>
-          {league.name}
-          {league.season ? ` · Season ${league.season}` : ''}
-        </T>
-        <T variant="display" style={{ fontSize: 44, lineHeight: 44 }}>
-          {league.finished_at ? 'Final standings' : 'Standings so far'}
-        </T>
-      </View>
-      <ErrorText error={error} />
+      <View onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+        <View>
+          <T variant="eyebrow" muted>
+            {league.name}
+            {league.season ? ` · Season ${league.season}` : ''}
+          </T>
+          <T variant="display" style={{ fontSize: 44, lineHeight: 44 }}>
+            {league.finished_at ? 'Final standings' : 'Standings so far'}
+          </T>
+        </View>
+        <ErrorText error={error} />
 
-      {top.length === 0 ? (
-        <Card>
-          <T variant="h2">Nothing to show yet</T>
-          <T muted>Stats appear once the first match is finished.</T>
-        </Card>
-      ) : (
-        <Row style={{ alignItems: 'flex-end', gap: space.s, marginTop: space.m }}>
-          {podium.map((r) => {
-            const place = top.indexOf(r) + 1;
-            const first = place === 1;
-            return (
-              <Pressable key={r.userId} style={{ flex: 1 }} onPress={() => router.push(`/player/${r.userId}`)}>
-                <View style={{ alignItems: 'center', gap: 4, marginBottom: space.s }}>
-                  <Avatar name={nameOf(r.userId)} size={first ? 52 : 40} />
-                  <T numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: first ? 17 : 15 }}>
-                    {nameOf(r.userId)}
-                  </T>
-                  <T style={{ fontFamily: fonts.num, fontSize: first ? 30 : 24, lineHeight: first ? 32 : 26 }}>
-                    {r.total}
-                  </T>
-                  <T variant="eyebrow" muted>
-                    points
-                  </T>
-                </View>
-                <View
-                  style={{
-                    height: heights[place],
-                    backgroundColor: first ? c.leader : c.surface,
-                    borderTopLeftRadius: radius.input,
-                    borderTopRightRadius: radius.input,
-                    borderWidth: first ? 0 : 1,
-                    borderBottomWidth: 0,
-                    borderColor: c.border,
-                    alignItems: 'center',
-                    paddingTop: space.s,
-                  }}>
-                  <T style={{ fontFamily: fonts.num, fontSize: first ? 48 : 36, lineHeight: first ? 52 : 40, color: first ? c.onLeader : c.text }}>
-                    {r.rank}
-                  </T>
-                  <T variant="eyebrow" style={{ color: first ? c.onLeader : c.muted }}>
-                    {place === 1 ? 'Winner' : place === 2 ? 'Runner-up' : 'Third'}
-                  </T>
-                </View>
-              </Pressable>
-            );
-          })}
-        </Row>
-      )}
+        {top.length === 0 ? (
+          <Card>
+            <T variant="h2">Nothing to show yet</T>
+            <T muted>Stats appear once the first match is finished.</T>
+          </Card>
+        ) : (
+          <Row style={{ alignItems: 'flex-end', gap: space.s, marginTop: space.m }}>
+            {podium.map((r) => {
+              const place = top.indexOf(r) + 1;
+              const first = place === 1;
+              return (
+                <Pressable key={r.userId} style={{ flex: 1 }} onPress={() => router.push(`/player/${r.userId}`)}>
+                  <View style={{ alignItems: 'center', gap: 4, marginBottom: space.s }}>
+                    <Avatar name={nameOf(r.userId)} size={first ? 52 : 40} />
+                    <T numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: first ? 17 : 15 }}>
+                      {nameOf(r.userId)}
+                    </T>
+                    <T style={{ fontFamily: fonts.num, fontSize: first ? 30 : 24, lineHeight: first ? 32 : 26 }}>
+                      {r.total}
+                    </T>
+                    <T variant="eyebrow" muted>
+                      points
+                    </T>
+                  </View>
+                  <View
+                    style={{
+                      height: heights[place],
+                      backgroundColor: first ? c.leader : c.surface,
+                      borderTopLeftRadius: radius.input,
+                      borderTopRightRadius: radius.input,
+                      borderWidth: first ? 0 : 1,
+                      borderBottomWidth: 0,
+                      borderColor: c.border,
+                      alignItems: 'center',
+                      paddingTop: space.s,
+                    }}>
+                    <T
+                      style={{
+                        fontFamily: fonts.num,
+                        fontSize: first ? 48 : 36,
+                        lineHeight: first ? 52 : 40,
+                        color: first ? c.onLeader : c.text,
+                      }}>
+                      {r.rank}
+                    </T>
+                    <T variant="eyebrow" style={{ color: first ? c.onLeader : c.muted }}>
+                      {place === 1 ? 'Winner' : place === 2 ? 'Runner-up' : 'Third'}
+                    </T>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </Row>
+        )}
+        {box && top.length ? <Fireworks width={box.w} height={box.h} /> : null}
+      </View>
 
       {table.length > 3 ? (
         <View style={{ marginTop: -space.s }}>
@@ -157,7 +169,6 @@ export default function SeasonStats() {
           </Card>
         ))}
       </View>
-
     </Screen>
   );
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, View } from 'react-native';
 
-import { displayName, getProfile, handicapsFor, listCourses, playerStats, updateProfile } from '@/lib/api';
+import { claimGuest, displayName, getProfile, handicapsFor, listCourses, playerStats, updateProfile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useAction, useLoad } from '@/lib/useLoad';
@@ -18,6 +19,10 @@ export default function ProfileScreen() {
   const [selfHcp, setSelfHcp] = useState('');
   const [editing, setEditing] = useState(false);
   const save = useAction();
+  const claim = useAction();
+  const [claimCode, setClaimCode] = useState('');
+  const [claimed, setClaimed] = useState(false);
+  const [openPair, setOpenPair] = useState<string | null>(null);
 
   const { data, error, loading, reload } = useLoad(async () => {
     const [profile, courses, stats] = await Promise.all([getProfile(userId!), listCourses(), playerStats(userId!)]);
@@ -35,7 +40,11 @@ export default function ProfileScreen() {
       if (value != null && (Number.isNaN(value) || value < -10 || value > 54)) {
         throw new Error('Handicap should be a number between +10 and 54.');
       }
-      await updateProfile(userId!, { display_name: name.trim(), nickname: nickname.trim() || null, self_handicap: value });
+      await updateProfile(userId!, {
+        display_name: name.trim(),
+        nickname: nickname.trim() || null,
+        self_handicap: value,
+      });
       setEditing(false);
       reload();
     });
@@ -67,7 +76,9 @@ export default function ProfileScreen() {
       <HcpCards
         app={hcp?.index}
         appNote={
-          hcp?.index != null ? `From last ${Math.min(rounds, 20)} card${rounds === 1 ? '' : 's'}` : `Needs 3 cards (${rounds} so far)`
+          hcp?.index != null
+            ? `From last ${Math.min(rounds, 20)} card${rounds === 1 ? '' : 's'}`
+            : `Needs 3 cards (${rounds} so far)`
         }
         own={own}
       />
@@ -112,24 +123,100 @@ export default function ProfileScreen() {
 
       {rounds > 0 ? (
         <>
-          <Section title="Cards counted" right={<T variant="eyebrow" muted>★ = in your HCP</T>} />
+          <Section
+            title="Rounds in your HCP"
+            right={
+              <T variant="eyebrow" muted>
+                ★ = counting now
+              </T>
+            }
+          />
+          <T variant="label" muted style={{ marginTop: -space.s }}>
+            Each number is how the round rated against the course. Your app HCP comes from the best 8 of your last 20.
+            Tap one to open the match.
+          </T>
           <View style={{ borderRadius: radius.card, overflow: 'hidden' }}>
-            {[...hcp!.differentials].reverse().slice(0, 20).map((d) => (
-              <Row
-                key={d.roundIds.join('+')}
-                style={{ justifyContent: 'space-between', paddingVertical: space.s, borderBottomWidth: 1, borderColor: c.border }}>
-                <T>
-                  {d.playedOn}
-                  {d.roundIds.length > 1 ? ' · two 9s' : ''}
-                </T>
-                <T style={{ fontFamily: fonts.num, fontSize: 20, color: hcp!.counting.includes(d) ? c.accentText : c.text }}>
-                  {hcp!.counting.includes(d) ? '★ ' : ''}
-                  {d.differential.toFixed(1)}
-                </T>
-              </Row>
-            ))}
+            {[...hcp!.differentials]
+              .reverse()
+              .slice(0, 20)
+              .map((d) => {
+                const key = d.roundIds.join('+');
+                const counting = hcp!.counting.includes(d);
+                const pair = d.roundIds.length > 1;
+                return (
+                  <View key={key} style={{ borderBottomWidth: 1, borderColor: c.border }}>
+                    <Pressable
+                      onPress={() =>
+                        pair ? setOpenPair(openPair === key ? null : key) : router.push(`/match/${d.roundIds[0]}`)
+                      }
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        minHeight: 44,
+                      }}>
+                      <T>
+                        {d.playedOn}
+                        {pair ? ` · two 9s ${openPair === key ? '▴' : '▾'}` : ' ›'}
+                      </T>
+                      <T style={{ fontFamily: fonts.num, fontSize: 20, color: counting ? c.accentText : c.text }}>
+                        {counting ? '★ ' : ''}
+                        {d.differential.toFixed(1)}
+                      </T>
+                    </Pressable>
+                    {pair && openPair === key
+                      ? d.roundIds.map((rid, i) => (
+                          <Pressable
+                            key={rid}
+                            onPress={() => router.push(`/match/${rid}`)}
+                            style={{ minHeight: 40, justifyContent: 'center', paddingLeft: space.l }}>
+                            <T style={{ color: c.accentText }}>{i === 0 ? 'First 9 ›' : 'Second 9 ›'}</T>
+                          </Pressable>
+                        ))
+                      : null}
+                  </View>
+                );
+              })}
           </View>
         </>
+      ) : null}
+
+      {data && (data.stats.rounds === 0 || claimed) ? (
+        <Card>
+          <T variant="h2">Claim your scores</T>
+          <T variant="label" muted>
+            Were you already on a scorecard before you signed up? Ask your league admin for your 6-character code.
+          </T>
+          <Row style={{ alignItems: 'flex-end' }}>
+            <View style={{ flex: 1 }}>
+              <Field
+                label="Claim code"
+                value={claimCode}
+                onChangeText={setClaimCode}
+                autoCapitalize="characters"
+                maxLength={6}
+              />
+            </View>
+            <Button
+              title="Claim"
+              kind="secondary"
+              busy={claim.busy}
+              disabled={claimCode.trim().length < 6}
+              onPress={() =>
+                claim.run(async () => {
+                  await claimGuest(claimCode);
+                  setClaimCode('');
+                  setClaimed(true);
+                  reload();
+                })
+              }
+            />
+          </Row>
+          <ErrorText error={claim.error} />
+          {claimed ? (
+            <T style={{ color: c.accentText }}>Done. Your old scores and leagues are now on your account.</T>
+          ) : null}
+        </Card>
       ) : null}
 
       <Button title="Sign out" kind="danger" onPress={() => supabase.auth.signOut()} />

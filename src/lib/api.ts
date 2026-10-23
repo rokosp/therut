@@ -14,10 +14,13 @@ export interface Profile {
   self_handicap: number | null;
   /** Last app handicap the player's own app worked out, shown to non-friends. */
   app_handicap?: number | null;
+  /** On scorecards but has no account yet; a league admin can share a claim code. */
+  is_guest?: boolean;
 }
 
 // app_handicap arrives with the friends migration; until that runs, fall back to the older columns.
-let PROFILE_COLS = 'id, display_name, nickname, self_handicap, app_handicap';
+// '*' so newer optional columns (app_handicap, is_guest) come along once their migration has run.
+let PROFILE_COLS = '*';
 async function withProfileCols<T>(
   run: (cols: string) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
 ): Promise<{ data: T | null; error: { message: string } | null }> {
@@ -225,6 +228,20 @@ export async function removeFriend(me: string, other: string) {
   );
 }
 
+// Guest players -----------------------------------------------------------
+
+export async function addGuestPlayer(leagueId: string, name: string): Promise<string> {
+  return check(await supabase.rpc('add_guest_player', { league: leagueId, name }));
+}
+
+export async function guestClaimCode(profileId: string): Promise<string> {
+  return check(await supabase.rpc('guest_claim_code', { p: profileId }));
+}
+
+export async function claimGuest(code: string): Promise<string> {
+  return check(await supabase.rpc('claim_guest', { code }));
+}
+
 // Courses -----------------------------------------------------------------
 
 export async function listCourses(): Promise<Course[]> {
@@ -289,7 +306,7 @@ export async function getLeague(id: string): Promise<LeagueBundle> {
     supabase.from('leagues').select('*').eq('id', id).single(),
     supabase
       .from('league_members')
-      .select('user_id, role, profiles(id, display_name, nickname, self_handicap)')
+      .select('user_id, role, profiles(*)')
       .eq('league_id', id),
     supabase.from('matches').select(MATCH_SELECT).eq('league_id', id).order('played_on', { ascending: false }),
   ]);

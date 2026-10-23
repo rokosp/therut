@@ -1,11 +1,12 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { View } from 'react-native';
+import { Share, View } from 'react-native';
 
 import {
   acceptFriend,
   displayName,
   friendState,
   getProfile,
+  guestClaimCode,
   handicapsFor,
   listCourses,
   listFriendships,
@@ -20,7 +21,7 @@ import { Avatar, Button, Card, ErrorText, Row, Screen, Section, T } from '@/ui/c
 import { confirmAction } from '@/ui/confirm';
 import { MatchCard, PastMatchCard } from '@/ui/MatchCard';
 import { HcpCards, StatsRow } from '@/ui/PlayerBits';
-import { space } from '@/ui/theme';
+import { fonts, space } from '@/ui/theme';
 
 export default function PlayerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,12 +30,19 @@ export default function PlayerScreen() {
 
   const { data, error, loading, reload } = useLoad(async () => {
     const [profile, friendships] = await Promise.all([getProfile(id), listFriendships()]);
+    if (profile.is_guest) {
+      // Guests have no account, so show their league history and (for admins) their claim code.
+      const code = await guestClaimCode(id).catch(() => null);
+      const [courses, stats, history] = await Promise.all([listCourses(), playerStats(id), playerMatches(id)]);
+      const hcp = (await handicapsFor([id], courses)).get(id)!;
+      return { profile, state: 'guest' as const, code, full: { courses, stats, history, hcp } };
+    }
     const state = id === userId ? 'friends' : friendState(userId!, id, friendships);
-    if (state !== 'friends') return { profile, state, full: null };
+    if (state !== 'friends') return { profile, state, code: null, full: null };
     // Friends (and you) get the full picture.
     const [courses, stats, history] = await Promise.all([listCourses(), playerStats(id), playerMatches(id)]);
     const hcp = (await handicapsFor([id], courses)).get(id)!;
-    return { profile, state, full: { courses, stats, history, hcp } };
+    return { profile, state, code: null, full: { courses, stats, history, hcp } };
   }, [id, userId]);
 
   if (!data) {
@@ -45,7 +53,11 @@ export default function PlayerScreen() {
     );
   }
 
-  const { profile, state, full } = data;
+  const { profile, state, full, code } = data;
+  const shareCode = () =>
+    Share.share({
+      message: `${profile.display_name}, your golf scores are waiting on The Rut. Sign up at https://rokosp.github.io/therut/ (or the Android app), go to Profile → "Claim your scores" and enter the code ${code}.`,
+    });
   const name = displayName(profile);
   const act = (fn: () => Promise<void>) => action.run(async () => (await fn(), await reload()));
   const rounds = full?.hcp.differentials.length ?? 0;
@@ -69,18 +81,49 @@ export default function PlayerScreen() {
 
       <HcpCards
         app={full ? full.hcp.index : profile.app_handicap}
-        appNote={full ? (full.hcp.index != null ? `From last ${Math.min(rounds, 20)} cards` : 'Needs 3 cards') : 'From their cards'}
+        appNote={
+          full
+            ? full.hcp.index != null
+              ? `From last ${Math.min(rounds, 20)} cards`
+              : 'Needs 3 cards'
+            : 'From their cards'
+        }
         own={profile.self_handicap}
       />
 
       <ErrorText error={action.error} />
-      {id !== userId ? (
+      {state === 'guest' ? (
+        <Card>
+          <T variant="h2">Guest player</T>
+          <T muted>
+            {name} doesn't have an account yet.
+            {code
+              ? ' When they sign up, they enter this code under Profile → Claim your scores, and everything here becomes theirs.'
+              : ''}
+          </T>
+          {code ? (
+            <Row style={{ justifyContent: 'space-between' }}>
+              <T style={{ fontFamily: fonts.num, fontSize: 32, letterSpacing: 3 }}>{code}</T>
+              <Button title="Send code" compact onPress={shareCode} />
+            </Row>
+          ) : null}
+        </Card>
+      ) : null}
+      {id !== userId && state !== 'guest' ? (
         state === 'none' ? (
           <Button title="Add friend" onPress={() => act(() => sendFriendRequest(userId!, id))} busy={action.busy} />
         ) : state === 'sent' ? (
-          <Button title="Friend request sent · cancel" kind="secondary" onPress={() => act(() => removeFriend(userId!, id))} />
+          <Button
+            title="Friend request sent · cancel"
+            kind="secondary"
+            onPress={() => act(() => removeFriend(userId!, id))}
+          />
         ) : state === 'received' ? (
-          <Button title={`Accept ${name}'s request`} onPress={() => act(() => acceptFriend(userId!, id))} busy={action.busy} />
+          <Button
+            title={`Accept ${name}'s request`}
+            onPress={() => act(() => acceptFriend(userId!, id))}
+            busy={action.busy}
+          />
         ) : null
       ) : null}
 
@@ -88,11 +131,11 @@ export default function PlayerScreen() {
         <>
           <StatsRow
             items={[
-          { v: full.stats.rounds, l: 'Matches\nplayed' },
-          { v: full.stats.wins, l: 'Matches\nwon' },
-          { v: full.stats.leagues, l: 'Leagues\nplayed' },
-          { v: full.stats.leagueWins, l: 'Leagues\nwon' },
-        ]}
+              { v: full.stats.rounds, l: 'Matches\nplayed' },
+              { v: full.stats.wins, l: 'Matches\nwon' },
+              { v: full.stats.leagues, l: 'Leagues\nplayed' },
+              { v: full.stats.leagueWins, l: 'Leagues\nwon' },
+            ]}
           />
           <Section title="Match history" />
           {full.history.matches.length === 0 ? <T muted>No matches yet.</T> : null}
@@ -103,7 +146,7 @@ export default function PlayerScreen() {
               <MatchCard key={m.id} match={m} profiles={full.history.profiles} courses={full.courses} />
             ),
           )}
-          {id !== userId ? (
+          {id !== userId && state !== 'guest' ? (
             <Button
               title="Remove friend"
               kind="danger"
