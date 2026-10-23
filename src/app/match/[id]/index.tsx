@@ -336,27 +336,51 @@ export default function MatchScreen() {
                   const value = p.hole_scores?.[hole] ?? null;
                   const par = parOf(hole) ?? 4;
                   return (
-                    <Row key={p.user_id} style={{ justifyContent: 'space-between', minHeight: 56 }}>
-                      <View style={{ flex: 1 }}>
-                        <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(p.user_id)}</T>
-                        {isStableford && value != null && parOf(hole) != null ? (
-                          <T variant="label" muted>
-                            {stablefordHole(value, parOf(hole)!)} pts
-                          </T>
-                        ) : null}
-                      </View>
-                      <Stepper
-                        value={value}
-                        par={parOf(hole)}
-                        onMinus={() => setHoleScore(p, value == null ? par : Math.max(1, value - 1))}
-                        onPlus={() => setHoleScore(p, value == null ? par : Math.min(15, value + 1))}
-                        onClear={() => setHoleScore(p, null)}
-                      />
-                    </Row>
+                    <View key={p.user_id} style={{ gap: space.xs, paddingVertical: space.xs }}>
+                      <Row style={{ justifyContent: 'space-between', minHeight: 56 }}>
+                        <View style={{ flex: 1 }}>
+                          <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(p.user_id)}</T>
+                          {isStableford && value != null && parOf(hole) != null ? (
+                            <T variant="label" muted>
+                              {stablefordHole(value, parOf(hole)!)} pts
+                            </T>
+                          ) : null}
+                        </View>
+                        <Stepper
+                          value={value}
+                          par={parOf(hole)}
+                          onMinus={() => setHoleScore(p, value == null ? par : Math.max(1, value - 1))}
+                          onPlus={() => setHoleScore(p, value == null ? par : Math.min(15, value + 1))}
+                          onTap={() => (value == null ? setHoleScore(p, par) : undefined)}
+                          onClear={() => setHoleScore(p, null)}
+                        />
+                      </Row>
+                      {/* One tap for the usual scores. */}
+                      <Row style={{ gap: space.xs }}>
+                        {[par - 1, par, par + 1, par + 2, par + 3]
+                          .filter((n) => n >= 1)
+                          .map((n) => (
+                            <QuickScore
+                              key={n}
+                              n={n}
+                              par={parOf(hole)}
+                              on={value === n}
+                              onPress={() => setHoleScore(p, n)}
+                            />
+                          ))}
+                      </Row>
+                    </View>
                   );
                 })}
+                {match.match_players.every((p) => p.hole_scores?.[hole] != null) && hole < played.holes - 1 ? (
+                  <Button
+                    title={`Next hole · ${hole + 2 + holeOffset} ›`}
+                    kind="accent"
+                    onPress={() => setHole(hole + 1)}
+                  />
+                ) : null}
                 <T variant="label" muted>
-                  Tap − or + to start at par. Long-press the score to clear it.
+                  Tap a number, or tap the empty score for par. Long-press a score to clear it.
                 </T>
               </>
             ) : (
@@ -729,22 +753,58 @@ function Stepper({
   par,
   onMinus,
   onPlus,
+  onTap,
   onClear,
 }: {
   value: number | null;
   par: number | null;
   onMinus: () => void;
   onPlus: () => void;
+  onTap: () => void;
   onClear: () => void;
 }) {
   return (
     <Row>
-      <Button title="−" kind="secondary" compact onPress={onMinus} style={{ width: 48 }} />
-      <Pressable onLongPress={onClear} style={{ width: 56, alignItems: 'center' }}>
+      <Button title="−" kind="secondary" compact onPress={onMinus} style={{ width: 52, minHeight: 52 }} />
+      <Pressable onPress={onTap} onLongPress={onClear} style={{ width: 60, alignItems: 'center' }}>
         <ScoreMark score={value} par={par} size={46} fontSize={26} />
       </Pressable>
-      <Button title="+" kind="secondary" compact onPress={onPlus} style={{ width: 48 }} />
+      <Button title="+" kind="secondary" compact onPress={onPlus} style={{ width: 52, minHeight: 52 }} />
     </Row>
+  );
+}
+
+const SCORE_NAMES: Record<number, string> = {
+  [-3]: 'Albatross',
+  [-2]: 'Eagle',
+  [-1]: 'Birdie',
+  0: 'Par',
+  1: 'Bogey',
+  2: 'Double',
+  3: 'Triple',
+};
+
+/** A one-tap score button: the number, with birdie/par/bogey underneath. */
+function QuickScore({ n, par, on, onPress }: { n: number; par: number | null; on: boolean; onPress: () => void }) {
+  const c = usePalette();
+  const name = par != null ? (n === 1 ? 'Ace' : SCORE_NAMES[n - par]) : null;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel={`${n}${name ? `, ${name}` : ''}`}
+      style={{
+        flex: 1,
+        minHeight: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: radius.small,
+        borderWidth: 1,
+        borderColor: on ? c.primary : c.border,
+        backgroundColor: on ? c.primary : 'transparent',
+      }}>
+      <T style={{ fontFamily: fonts.num, fontSize: 20, lineHeight: 22, color: on ? c.onPrimary : c.text }}>{n}</T>
+      {name ? <T style={{ fontSize: 10, lineHeight: 12, color: on ? c.onPrimary : c.muted }}>{name}</T> : null}
+    </Pressable>
   );
 }
 

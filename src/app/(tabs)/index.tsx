@@ -2,13 +2,22 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { displayName, handicapsFor, listCourses, listLeagues, listUpcoming, syncMyHandicap } from '@/lib/api';
+import {
+  displayName,
+  handicapsFor,
+  listCourses,
+  listLeagues,
+  listLiveMatches,
+  listUpcoming,
+  syncMyHandicap,
+} from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { brand, fonts, space, usePalette, useScheme } from '@/ui/theme';
 import { WeatherLine } from '@/ui/Weather';
 import { WeatherArt } from '@/ui/WeatherArt';
+import { LiveDot } from '@/ui/LiveDot';
 
 export default function Home() {
   const { userId } = useAuth();
@@ -21,7 +30,12 @@ export default function Home() {
     loading,
     reload,
   } = useLoad(async () => {
-    const [leagues, upcoming, courses] = await Promise.all([listLeagues(), listUpcoming(userId!), listCourses()]);
+    const [leagues, upcoming, courses, live] = await Promise.all([
+      listLeagues(),
+      listUpcoming(userId!),
+      listCourses(),
+      listLiveMatches().catch(() => ({ matches: [], profiles: [] })),
+    ]);
     // Keep my app handicap on my profile up to date, so non-friends see the right number.
     listCourses()
       .then((courses) => handicapsFor([userId!], courses))
@@ -30,10 +44,13 @@ export default function Home() {
         if (mine) return syncMyHandicap(userId!, mine.index, mine.differentials.length);
       })
       .catch(() => {});
-    return { leagues, upcoming, courses };
+    // Matches I'm playing in right now.
+    const mine = live.matches.filter((m) => m.match_players.some((p) => p.user_id === userId));
+    return { leagues, upcoming, courses, mine };
   }, [userId]);
   const leagues = home?.leagues;
   const upcoming = home?.upcoming.matches ?? [];
+  const playing = home?.mine ?? [];
 
   const active = leagues?.filter((l) => !l.finished_at) ?? [];
   const past = leagues?.filter((l) => l.finished_at) ?? [];
@@ -46,6 +63,33 @@ export default function Home() {
         </T>
       </View>
       <ErrorText error={error} />
+      {playing.map((m) => {
+        const course = home!.courses.find((x) => x.id === m.course_id);
+        const me = m.match_players.find((p) => p.user_id === userId);
+        const next = (me?.hole_scores ?? []).findIndex((x) => x == null);
+        const done = (me?.hole_scores ?? []).filter((x) => x != null).length;
+        const holeNo = (next === -1 ? (done >= m.holes ? m.holes : done + 1) : next + 1) + (m.nine === 'back' ? 9 : 0);
+        return (
+          <Pressable
+            key={m.id}
+            onPress={() => router.push(`/match/${m.id}`)}
+            accessibilityRole="button"
+            style={{ backgroundColor: c.primary, borderRadius: 14, padding: space.l, gap: 2 }}>
+            <Row style={{ gap: space.s, alignItems: 'center' }}>
+              <LiveDot color="#E8705F" />
+              <T variant="eyebrow" style={{ color: c.onPrimary }}>
+                You're playing · hole {holeNo}
+              </T>
+            </Row>
+            <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <T variant="h2" style={{ color: c.onPrimary, flex: 1 }} numberOfLines={1}>
+                {course?.name ?? 'Match'}
+              </T>
+              <T style={{ fontFamily: fonts.bodyBold, color: brand.blaze }}>Resume match ›</T>
+            </Row>
+          </Pressable>
+        );
+      })}
       {upcoming.length ? (
         <>
           <Section title="Upcoming" />
