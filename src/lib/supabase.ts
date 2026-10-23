@@ -2,8 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+// The publishable key is meant to ship inside the app; row level security protects the data.
+// .env values win, so a different project can be used for testing.
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://nkjvbztetbicdkfvxgbq.supabase.co';
+const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_pldQND8iSHivPa4NWDXa_A_0X3WZUHm';
 
 export const isConfigured = !!url && !!anonKey;
 
