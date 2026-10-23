@@ -1,52 +1,25 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
-import { displayName, holesFor, listCourses, listLiveMatches, type LiveMatch, type Profile } from '@/lib/api';
+import { displayName, holesFor, type Course, type LiveMatch, type Profile } from '@/lib/api';
 import { buildCommentary } from '@/lib/commentary';
 import { strokesPerHole } from '@/lib/handicap';
 import { withDefaults } from '@/lib/types';
-import { useLoad } from '@/lib/useLoad';
-import { Card, ErrorText, Row, Screen, T, Tag } from '@/ui/components';
+import { Card, Row, T, Tag } from '@/ui/components';
 import { fonts, space, usePalette } from '@/ui/theme';
 
-export default function LiveScreen() {
-  const { data, error, loading, reload } = useLoad(
-    async () => {
-      const [live, courses] = await Promise.all([listLiveMatches(), listCourses()]);
-      return { ...live, courses };
-    },
-    [],
-    { pollMs: 10000 },
-  );
-
-  return (
-    <Screen refreshing={loading} onRefresh={reload}>
-      <T muted>Matches being played right now in your leagues. Updates every few seconds.</T>
-      <ErrorText error={error} />
-      {data?.matches.length === 0 ? (
-        <Card>
-          <T variant="title">Nobody's out right now</T>
-          <T muted>When a match is started, it shows up here so you can follow along.</T>
-        </Card>
-      ) : null}
-      {data?.matches.map((m) => (
-        <LiveCard key={m.id} match={m} profiles={data.profiles} courses={data.courses} />
-      ))}
-    </Screen>
-  );
-}
-
-function LiveCard({
+/** Match summary with a mini leaderboard and the latest commentary line. */
+export function MatchCard({
   match,
   profiles,
   courses,
 }: {
   match: LiveMatch;
   profiles: Profile[];
-  courses: Awaited<ReturnType<typeof listCourses>>;
+  courses: Course[];
 }) {
   const c = usePalette();
-  const settings = withDefaults(match.leagues.settings);
+  const settings = withDefaults(match.leagues?.settings);
   const { course, played } = holesFor(match, courses);
   const net = settings.scoring === 'net';
   const nameOf = (id: string) => displayName(profiles.find((p) => p.id === id));
@@ -88,11 +61,11 @@ function LiveCard({
     <Card onPress={() => router.push(`/match/${match.id}`)}>
       <Row style={{ justifyContent: 'space-between' }}>
         <Row>
-          <Tag kind="live" label="● Live" />
+          {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
           <Tag kind={match.kind} label={`${match.kind} · ${match.holes}`} />
         </Row>
         <T variant="eyebrow" muted>
-          {match.leagues.name}
+          {match.leagues?.name ?? "Friend's league"} · {match.played_on}
         </T>
       </Row>
       <T variant="h2">{course?.name ?? 'Match'}</T>
@@ -101,7 +74,7 @@ function LiveCard({
           <T style={{ width: 24, fontFamily: fonts.num, fontSize: 20 }}>{i + 1}</T>
           <T style={{ flex: 1, fontFamily: fonts.bodyBold }}>{nameOf(r.id)}</T>
           <T variant="label" muted style={{ width: 64, textAlign: 'right' }}>
-            {r.thru === 0 ? 'not started' : r.thru === played.holes ? 'done' : `thru ${r.thru}`}
+            {r.thru === 0 ? 'not started' : r.thru === played.holes ? 'F' : `thru ${r.thru}`}
           </T>
           <T style={{ width: 52, textAlign: 'right', fontFamily: fonts.num, fontSize: 24 }}>
             {r.thru === 0 ? '–' : played.holePars ? fmt(r.toPar) : r.total}
@@ -118,7 +91,7 @@ function LiveCard({
         </View>
       ) : null}
       <T variant="label" muted>
-        {net ? 'Net scores' : 'Gross scores'} · tap to watch
+        {net ? 'Net scores' : 'Gross scores'} · {match.status === 'open' ? 'tap to watch' : 'tap for the card'}
       </T>
     </Card>
   );

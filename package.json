@@ -45,7 +45,7 @@
     "lint": "expo lint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "seed:courses": "node scripts/gen-course-seed.mjs && cat supabase/migrations/*.sql supabase/seed.sql > supabase/setup-all.sql"
+    "seed:courses": "node scripts/gen-course-seed.mjs && (echo '-- One-shot setup for a fresh project: paste into Supabase > SQL Editor and run once.'; echo; cat supabase/migrations/*.sql supabase/seed.sql) > supabase/setup-all.sql"
   },
   "private": true
 }

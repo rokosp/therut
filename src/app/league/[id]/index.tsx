@@ -77,8 +77,8 @@ export default function LeagueScreen() {
           const fg = lead ? c.onLeader : c.text;
           const sharedRank = table.filter((x) => x.rank === r.rank).length > 1;
           return (
+            <Pressable key={r.userId} onPress={() => router.push(`/player/${r.userId}`)}>
             <Row
-              key={r.userId}
               style={{
                 paddingHorizontal: space.l,
                 paddingVertical: space.m,
@@ -100,6 +100,7 @@ export default function LeagueScreen() {
               </View>
               <T style={{ fontFamily: fonts.num, fontSize: 28, color: fg }}>{r.total}</T>
             </Row>
+            </Pressable>
           );
         })}
       </View>

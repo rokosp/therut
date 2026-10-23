@@ -11,6 +11,21 @@ export interface Profile {
   display_name: string;
   nickname: string | null;
   self_handicap: number | null;
+  /** Last app handicap the player's own app worked out, shown to non-friends. */
+  app_handicap?: number | null;
+}
+
+// app_handicap arrives with the friends migration; until that runs, fall back to the older columns.
+let PROFILE_COLS = 'id, display_name, nickname, self_handicap, app_handicap';
+async function withProfileCols<T>(
+  run: (cols: string) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<{ data: T | null; error: { message: string } | null }> {
+  const res = (await run(PROFILE_COLS)) as { data: T | null; error: { message: string } | null };
+  if (res.error && PROFILE_COLS.includes('app_handicap') && res.error.message.includes('app_handicap')) {
+    PROFILE_COLS = 'id, display_name, nickname, self_handicap';
+    return (await run(PROFILE_COLS)) as { data: T | null; error: { message: string } | null };
+  }
+  return res;
 }
 
 export interface Tee extends TeeInfo {
@@ -90,7 +105,9 @@ const MATCH_SELECT = '*, match_players(*), bonus_awards(*)';
 
 export async function getProfile(id: string): Promise<Profile & { created_at: string }> {
   return check(
-    await supabase.from('profiles').select('id, display_name, nickname, self_handicap, created_at').eq('id', id).single(),
+    await withProfileCols<Profile & { created_at: string }>((cols) =>
+      supabase.from('profiles').select(`${cols}, created_at`).eq('id', id).single(),
+    ),
   );
 }
 
@@ -106,12 +123,12 @@ export async function playerStats(userId: string) {
         'id',
         mine.map((m) => m.match_id),
       ),
-  ) as (MatchRow & { leagues: { settings: Partial<LeagueSettings> } })[];
+  ) as (MatchRow & { leagues: { settings: Partial<LeagueSettings> } | null })[];
   let rounds = 0;
   let wins = 0;
   const grosses: number[] = [];
   for (const m of matches) {
-    const r = resultsFor(m, withDefaults(m.leagues.settings)).find((x) => x.userId === userId);
+    const r = resultsFor(m, withDefaults(m.leagues?.settings)).find((x) => x.userId === userId);
     if (!r || r.gross == null) continue;
     rounds += 1;
     if (m.holes === 18) grosses.push(r.gross);
@@ -127,7 +144,62 @@ export async function updateProfile(id: string, patch: Partial<Omit<Profile, 'id
 
 export async function getProfiles(ids: string[]): Promise<Profile[]> {
   if (ids.length === 0) return [];
-  return check(await supabase.from('profiles').select('id, display_name, nickname, self_handicap').in('id', ids));
+  return check(await withProfileCols<Profile[]>((cols) => supabase.from('profiles').select(cols).in('id', ids)));
+}
+
+/** Save my latest app handicap on my profile so non-friends can see it. */
+export async function syncMyHandicap(id: string, index: number | null, rounds: number) {
+  await supabase.from('profiles').update({ app_handicap: index, app_handicap_rounds: rounds }).eq('id', id);
+}
+
+// Friends -----------------------------------------------------------------
+
+export interface Friendship {
+  requester: string;
+  addressee: string;
+  status: 'pending' | 'accepted';
+}
+
+export type FriendState = 'none' | 'friends' | 'sent' | 'received';
+
+export async function listFriendships(): Promise<Friendship[]> {
+  return check(await supabase.from('friendships').select('requester, addressee, status'));
+}
+
+export function friendState(me: string, other: string, all: Friendship[]): FriendState {
+  const f = all.find(
+    (x) => (x.requester === me && x.addressee === other) || (x.requester === other && x.addressee === me),
+  );
+  if (!f) return 'none';
+  if (f.status === 'accepted') return 'friends';
+  return f.requester === me ? 'sent' : 'received';
+}
+
+export async function searchPlayers(q: string): Promise<Profile[]> {
+  const term = q.trim().replace(/[%_,()]/g, '');
+  if (term.length < 2) return [];
+  return check(
+    await withProfileCols<Profile[]>((cols) =>
+      supabase.from('profiles').select(cols).or(`display_name.ilike.%${term}%,nickname.ilike.%${term}%`).limit(20),
+    ),
+  );
+}
+
+export async function sendFriendRequest(me: string, other: string) {
+  check(await supabase.from('friendships').insert({ requester: me, addressee: other }));
+}
+
+export async function acceptFriend(me: string, requester: string) {
+  check(await supabase.from('friendships').update({ status: 'accepted' }).eq('requester', requester).eq('addressee', me));
+}
+
+export async function removeFriend(me: string, other: string) {
+  check(
+    await supabase
+      .from('friendships')
+      .delete()
+      .or(`and(requester.eq.${me},addressee.eq.${other}),and(requester.eq.${other},addressee.eq.${me})`),
+  );
 }
 
 // Courses -----------------------------------------------------------------
@@ -277,10 +349,11 @@ export async function removeBonus(id: string) {
 }
 
 export interface LiveMatch extends MatchRow {
-  leagues: { name: string; settings: Partial<LeagueSettings> };
+  /** Null when the match is in a league I'm not in (I see it through a friend). */
+  leagues: { name: string; settings: Partial<LeagueSettings> } | null;
 }
 
-/** Matches still being played in any league I'm in, with player names. */
+/** Matches still being played in my leagues or by my friends, with player names. */
 export async function listLiveMatches(): Promise<{ matches: LiveMatch[]; profiles: Profile[] }> {
   const matches = check(
     await supabase
@@ -288,6 +361,25 @@ export async function listLiveMatches(): Promise<{ matches: LiveMatch[]; profile
       .select(`${MATCH_SELECT}, leagues(name, settings)`)
       .eq('status', 'open')
       .order('played_on', { ascending: false }),
+  ) as LiveMatch[];
+  const ids = [...new Set(matches.flatMap((m) => m.match_players.map((p) => p.user_id)))];
+  return { matches, profiles: await getProfiles(ids) };
+}
+
+/** A player's matches, newest first (only ones I'm allowed to see). */
+export async function playerMatches(userId: string, limit = 20): Promise<{ matches: LiveMatch[]; profiles: Profile[] }> {
+  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as { match_id: string }[];
+  if (mine.length === 0) return { matches: [], profiles: [] };
+  const matches = check(
+    await supabase
+      .from('matches')
+      .select(`${MATCH_SELECT}, leagues(name, settings)`)
+      .in(
+        'id',
+        mine.map((m) => m.match_id),
+      )
+      .order('played_on', { ascending: false })
+      .limit(limit),
   ) as LiveMatch[];
   const ids = [...new Set(matches.flatMap((m) => m.match_players.map((p) => p.user_id)))];
   return { matches, profiles: await getProfiles(ids) };

@@ -30,8 +30,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Leagues',
-          tabBarLabel: 'Leagues',
+          title: 'The Rut',
+          tabBarLabel: 'League',
           headerRight: () => (
             <Pressable onPress={() => router.navigate('/profile')} hitSlop={12} style={{ marginRight: 16 }}>
               <Avatar name={name} />
@@ -39,7 +39,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="live" options={{ title: 'Live', tabBarLabel: 'Live' }} />
+      <Tabs.Screen name="matches" options={{ title: 'Matches', tabBarLabel: 'Matches' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarLabel: 'Profile' }} />
     </Tabs>
   );

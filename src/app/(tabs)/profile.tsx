@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Avatar, Button, Card, ErrorText, Field, Row, Screen, Section, T } from '@/ui/components';
+import { Friends } from '@/ui/Friends';
+import { HcpCards, StatsRow } from '@/ui/PlayerBits';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 export default function ProfileScreen() {
@@ -62,57 +64,28 @@ export default function ProfileScreen() {
         </Row>
       ) : null}
 
-      <Row style={{ alignItems: 'stretch', gap: space.s }}>
-        <View style={{ flex: 1, backgroundColor: c.primary, borderRadius: 12, padding: space.m, gap: 2 }}>
-          <T variant="eyebrow" style={{ color: c.onPrimary }}>
-            App HCP
-          </T>
-          <T variant="score" style={{ color: c.onPrimary, fontSize: 44 }}>
-            {hcp?.index != null ? hcp.index.toFixed(1) : '–'}
-          </T>
-          <T variant="label" style={{ color: c.onPrimary }}>
-            {hcp?.index != null
-              ? `From last ${Math.min(rounds, 20)} card${rounds === 1 ? '' : 's'}`
-              : `Needs 3 cards (${rounds} so far)`}
-          </T>
-        </View>
-        <View
-          style={{
-            flex: 1,
-            borderWidth: 1.5,
-            borderStyle: 'dashed',
-            borderColor: c.head,
-            borderRadius: 12,
-            padding: space.m,
-            gap: 2,
-          }}>
-          <T variant="eyebrow">Own HCP</T>
-          <T variant="score" style={{ fontSize: 44 }}>
-            {own != null ? Number(own).toFixed(1) : '–'}
-          </T>
-          <T variant="label">{own != null ? 'Entered by you' : 'Not set'}</T>
-        </View>
-      </Row>
+      <HcpCards
+        app={hcp?.index}
+        appNote={
+          hcp?.index != null ? `From last ${Math.min(rounds, 20)} card${rounds === 1 ? '' : 's'}` : `Needs 3 cards (${rounds} so far)`
+        }
+        own={own}
+      />
       {hcp?.pendingNine ? (
         <T variant="label" muted>
           One 9-hole card is waiting for a second 9 to pair with.
         </T>
       ) : null}
 
-      <Row style={{ gap: space.s }}>
-        {[
+      <StatsRow
+        items={[
           { v: data?.stats.rounds ?? '–', l: 'Rounds' },
           { v: data?.stats.avg18 ?? '–', l: 'Avg (18)' },
           { v: data?.stats.wins ?? '–', l: 'Wins' },
-        ].map((s) => (
-          <View key={s.l} style={{ flex: 1, alignItems: 'center', borderTopWidth: 2, borderColor: c.accent, paddingTop: space.s }}>
-            <T style={{ fontFamily: fonts.num, fontSize: 28 }}>{s.v}</T>
-            <T variant="label" muted>
-              {s.l}
-            </T>
-          </View>
-        ))}
-      </Row>
+        ]}
+      />
+
+      <Friends />
 
       {editing ? (
         <Card>

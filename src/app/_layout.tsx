@@ -62,6 +62,7 @@ function RootStack() {
           <Stack.Screen name="league/[id]/settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="league/[id]/new-match" options={{ title: 'New match' }} />
           <Stack.Screen name="match/[id]" options={{ title: 'Match' }} />
+          <Stack.Screen name="player/[id]" options={{ title: 'Player' }} />
         </Stack.Protected>
       </Stack>
     </>
