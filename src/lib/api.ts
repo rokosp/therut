@@ -766,3 +766,9 @@ export async function postChat(matchId: string, body: string) {
 export async function deleteChat(id: string) {
   check(await supabase.from('match_chat').delete().eq('id', id));
 }
+
+/** Whether any match I can see is being played right now (for the dot on the Matches tab). */
+export async function anyLiveMatch(): Promise<boolean> {
+  const res = await supabase.from('matches').select('id').eq('status', 'open').limit(1);
+  return !res.error && (res.data?.length ?? 0) > 0;
+}

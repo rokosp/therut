@@ -3,12 +3,12 @@ import { Tabs } from 'expo-router/tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable, View } from 'react-native';
 
-import { getProfile, listFriendships, listNotifications } from '@/lib/api';
+import { anyLiveMatch, getProfile, listFriendships, listNotifications } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
 import { BackButton } from '@/ui/BackButton';
 import { Avatar, HeaderTitle, Row, T } from '@/ui/components';
-import { fonts, space, usePalette } from '@/ui/theme';
+import { brand, fonts, space, usePalette } from '@/ui/theme';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
@@ -17,13 +17,14 @@ export default function TabsLayout() {
   // My photo for the header, and how many friend requests are waiting (shown on the Profile tab).
   const { data: me } = useLoad(
     async () => {
-      const [profile, friendships, notes] = await Promise.all([
+      const [profile, friendships, notes, live] = await Promise.all([
         getProfile(userId!),
         listFriendships(),
         listNotifications(),
+        anyLiveMatch(),
       ]);
       const requests = friendships.filter((f) => f.status === 'pending' && f.addressee === userId).length;
-      return { avatar: profile.avatar_url ?? null, requests, unread: notes.filter((n) => !n.read_at).length };
+      return { avatar: profile.avatar_url ?? null, requests, unread: notes.filter((n) => !n.read_at).length, live };
     },
     [userId],
     { pollMs: 30000 },
@@ -95,7 +96,20 @@ export default function TabsLayout() {
         name="matches"
         options={{
           title: 'Matches',
-          tabBarLabel: 'Matches',
+          tabBarLabel: ({ color }) => (
+            <Row style={{ gap: 6, alignItems: 'center' }}>
+              <T
+                style={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase', color }}>
+                Matches
+              </T>
+              {me?.live ? (
+                <View
+                  accessibilityLabel="A match is live"
+                  style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: brand.birdie }}
+                />
+              ) : null}
+            </Row>
+          ),
           headerLeft: () => <BackButton home />,
           headerRight: () => (
             <Pressable onPress={() => router.push('/calendar')} hitSlop={12} style={{ marginRight: 16 }}>
