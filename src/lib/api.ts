@@ -176,7 +176,8 @@ export async function playerStats(userId: string) {
         par: played.par,
       });
     }
-    const r = resultsFor(m, withDefaults(m.leagues?.settings), courses).find((x) => x.userId === userId);
+    const all = resultsFor(m, withDefaults(m.leagues?.settings), courses);
+    const r = all.find((x) => x.userId === userId);
     if (mp) {
       const { course, played } = holesFor(m, courses, mp.tee_id);
       achRounds.push({
@@ -195,6 +196,16 @@ export async function playerStats(userId: string) {
         won: m.status === 'final' && r?.position === 1 && !r.tied && m.match_players.length > 1,
         solo: m.match_players.length === 1,
         bonuses: m.bonus_awards.filter((b) => b.user_id === userId).length,
+        winMargin: winMarginOf(all, userId),
+        opponents:
+          m.status === 'final' && r?.position != null
+            ? all
+                .filter((o) => o.userId !== userId && o.position != null)
+                .map((o) => ({
+                  id: o.userId,
+                  result: o.position! > r.position! ? 'won' : o.position! < r.position! ? 'lost' : 'tied',
+                }))
+            : [],
       });
     }
     if (!r || r.gross == null) continue;
@@ -225,6 +236,13 @@ export async function playerStats(userId: string) {
     career: careerHighlights(careerRounds),
     achievements: computeAchievements({ rounds: achRounds, leagueWins }),
   };
+}
+
+/** How far ahead of second place the winner finished (strokes, or Stableford points). */
+function winMarginOf(results: PlayerResult[], userId: string): number | null {
+  const ranked = results.filter((x) => x.score != null).sort((a, b) => a.score! - b.score!);
+  if (ranked.length < 2 || ranked[0].userId !== userId) return null;
+  return ranked[1].score! - ranked[0].score!;
 }
 
 /** Local tee-off hour: the planned tee time, or when the match was started on the day itself. */

@@ -20,6 +20,10 @@ export interface AchRound {
   /** Nobody else in the match. */
   solo: boolean;
   bonuses: number;
+  /** Strokes (or points) ahead of second place, when won. */
+  winMargin?: number | null;
+  /** How it went against each other player in a finished match. */
+  opponents?: { id: string; result: 'won' | 'lost' | 'tied' }[];
 }
 
 export type AchGroup = 'Playing' | 'Strokes' | 'Winning' | 'Holes' | 'Rounds' | 'Fun';
@@ -57,6 +61,7 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
   let aces = 0;
   let snowmen = 0;
   let doubleDs = 0;
+  let rollerCoaster = 0;
   let bestBirdiesInRound = 0;
   let bogeyFree9 = 0;
   let best18: number | null = null;
@@ -71,6 +76,8 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     strokes += scored.length ? scored.reduce((a, b) => a + b, 0) : (r.gross ?? 0);
     let roundBirdies = 0;
     let hadDouble = false;
+    let hadUnder = false;
+    let hadTriple = false;
     s.forEach((x, i) => {
       if (x == null) return;
       if (x === 1) aces += 1;
@@ -83,6 +90,8 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
       if (d === -1) ((birdies += 1), (roundBirdies += 1));
       if (d <= -2 && x !== 1) eagles += 1;
       if (d >= 2) hadDouble = true;
+      if (d <= -1) hadUnder = true;
+      if (d >= 3) hadTriple = true;
       if (d <= 0 && r.courseId) {
         const set = parredHoles.get(r.courseId) ?? new Set<number>();
         set.add(r.firstHole + i);
@@ -100,6 +109,7 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     if (total != null && complete(r) && total <= r.par) evenKeel = 1;
     if (total != null && r.holes === 18) best18 = best18 == null ? total : Math.min(best18, total);
     if (r.won && hadDouble) comeback = 1;
+    if (hadUnder && hadTriple) rollerCoaster = 1;
   }
 
   const finals = byDate.filter((r) => r.final);
@@ -123,6 +133,30 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     weekends.set(k, (weekends.get(k) ?? 0) + 1);
   }
   const bestWeekend = Math.max(0, ...weekends.values());
+
+  // Two full 18s on the same day.
+  const eighteensByDay = new Map<string, number>();
+  for (const r of rounds) if (r.holes === 18) eighteensByDay.set(r.playedOn, (eighteensByDay.get(r.playedOn) ?? 0) + 1);
+  const bestDay = Math.max(0, ...eighteensByDay.values());
+
+  const margins = rounds.filter((r) => r.won && r.winMargin != null).map((r) => r.winMargin!);
+  const photoFinish = margins.some((m) => m === 1) ? 1 : 0;
+  const blowout = margins.some((m) => m >= 10) ? 1 : 0;
+
+  // Rivals: matches, wins and losses against each player.
+  const vs = new Map<string, { played: number; won: number; lost: number }>();
+  for (const r of rounds)
+    for (const o of r.opponents ?? []) {
+      const v = vs.get(o.id) ?? { played: 0, won: 0, lost: 0 };
+      v.played += 1;
+      if (o.result === 'won') v.won += 1;
+      if (o.result === 'lost') v.lost += 1;
+      vs.set(o.id, v);
+    }
+  const rivalry = Math.max(0, ...[...vs.values()].map((v) => v.played));
+  // Your nemesis is whoever has beaten you most; beat them once to slay them.
+  const nemesis = [...vs.values()].filter((v) => v.lost > 0).sort((a, b) => b.lost - a.lost)[0];
+  const slayed = nemesis && nemesis.won > 0 ? 1 : 0;
   const courses = new Set(rounds.map((r) => r.courseId).filter(Boolean)).size;
   const bonuses = rounds.reduce((a, r) => a + r.bonuses, 0);
   const n = rounds.length;
@@ -143,6 +177,8 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     a('played-10', 'Playing', '10', 'Regular', 'Play 10 matches.', n, 10),
     a('played-50', 'Playing', '50', 'Lifer', 'Play 50 matches.', n, 50),
     a('played-100', 'Playing', '100', 'Centurion', 'Play 100 matches.', n, 100),
+    a('iron-man', 'Playing', '36', 'Iron Man', 'Play two full 18s in one day.', bestDay, 2),
+    a('rivalry', 'Playing', 'VS', 'Rivalry', 'Play 10 matches against the same player.', rivalry, 10),
     a('weekend', 'Playing', 'WKD', 'Weekend Warrior', 'Play twice in one weekend.', bestWeekend, 2),
     a('explorer', 'Playing', 'MAP', 'Explorer', 'Play 3 different courses.', courses, 3),
 
@@ -151,6 +187,9 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     a('hat-trick', 'Winning', '3W', 'Hat Trick', 'Win 3 matches in a row.', bestStreak, 3),
     a('champion', 'Winning', 'CUP', 'Champion', 'Win a league season.', input.leagueWins),
     a('dynasty', 'Winning', '2X', 'Dynasty', 'Win 2 league seasons.', input.leagueWins, 2),
+    a('photo-finish', 'Winning', '+1', 'Photo Finish', 'Win a match by a single stroke.', photoFinish),
+    a('blowout', 'Winning', '+10', 'Blowout', 'Win a match by 10 or more.', blowout),
+    a('nemesis', 'Winning', 'NS', 'Nemesis Slayer', 'Beat the player who has beaten you the most.', slayed),
     a('comeback', 'Winning', 'CB', 'Comeback Kid', 'Win a match with a double bogey or worse on your card.', comeback),
 
     a('par', 'Holes', 'PAR', 'Par Starter', 'Make your first par.', pars),
@@ -184,6 +223,15 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     a('strokes-10k', 'Strokes', '10K', 'Stroked It 10K', 'Hit 10,000 strokes.', strokes, 10000),
 
     a('snowman', 'Fun', '8', 'Snowman', 'Card an 8 (or worse) on a hole.', snowmen),
+    a('roller-coaster', 'Fun', '~', 'Roller Coaster', 'A birdie and a triple bogey in the same round.', rollerCoaster),
+    a(
+      'night-owl',
+      'Fun',
+      'PM',
+      'Night Owl',
+      'Tee off at 18:00 or later.',
+      rounds.filter((r) => r.teeHour != null && r.teeHour >= 18).length,
+    ),
     a('double-ds', 'Fun', '10+', "Double D's", 'Card a double-digit score on a hole.', doubleDs),
     a(
       'lone-wolf',

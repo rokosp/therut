@@ -83,4 +83,31 @@ describe('computeAchievements', () => {
     expect(get(eighteen, 'broke-90').earned).toBe(false);
     expect(get(eighteen, 'broke-140').earned).toBe(true);
   });
+
+  it('reads margins, rivals, long days and wild rounds', () => {
+    const r18 = (extra: Partial<AchRound>) => round([...pars9, ...pars9], extra);
+    const list = computeAchievements({
+      rounds: [
+        r18({ won: true, winMargin: 1, playedOn: '2026-10-01', opponents: [{ id: 'jela', result: 'won' }] }),
+        r18({
+          playedOn: '2026-10-01',
+          teeHour: 18,
+          opponents: [
+            { id: 'jela', result: 'lost' },
+            { id: 'adrian', result: 'lost' },
+          ],
+        }),
+        r18({ playedOn: '2026-10-02', opponents: [{ id: 'jela', result: 'lost' }] }),
+        round([3, 3, 8, 4, 4, 3, 5, 4, 4]),
+      ],
+      leagueWins: 0,
+    });
+    expect(get(list, 'photo-finish').earned).toBe(true);
+    expect(get(list, 'blowout').earned).toBe(false);
+    expect(get(list, 'iron-man').earned).toBe(true);
+    expect(get(list, 'night-owl').earned).toBe(true);
+    expect(get(list, 'roller-coaster').earned).toBe(true);
+    expect(get(list, 'nemesis').earned).toBe(true); // Jela beat me twice, but I beat her once
+    expect(get(list, 'rivalry').value).toBe(3);
+  });
 });
