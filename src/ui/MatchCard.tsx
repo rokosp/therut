@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { View } from 'react-native';
 
 import { displayName, holesFor, type Course, type LiveMatch, type Profile } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { buildCommentary } from '@/lib/commentary';
 import { strokesPerHole } from '@/lib/handicap';
 import { withDefaults } from '@/lib/types';
@@ -9,16 +10,9 @@ import { Card, Row, T, Tag } from '@/ui/components';
 import { fonts, space, usePalette } from '@/ui/theme';
 
 /** Match summary with a mini leaderboard and the latest commentary line. */
-export function MatchCard({
-  match,
-  profiles,
-  courses,
-}: {
-  match: LiveMatch;
-  profiles: Profile[];
-  courses: Course[];
-}) {
+export function MatchCard({ match, profiles, courses }: { match: LiveMatch; profiles: Profile[]; courses: Course[] }) {
   const c = usePalette();
+  const { userId } = useAuth();
   const settings = withDefaults(match.leagues?.settings);
   const { course, played } = holesFor(match, courses);
   const net = settings.scoring === 'net';
@@ -81,7 +75,8 @@ export function MatchCard({
           </T>
         </Row>
       ))}
-      {feed.length > 0 ? (
+      {feed.length > 0 &&
+      !(match.status === 'open' && userId && match.match_players.some((p) => p.user_id === userId)) ? (
         <View style={{ borderTopWidth: 1, borderColor: c.border, paddingTop: space.s, gap: space.xs }}>
           {feed.slice(0, 2).map((l, i) => (
             <T key={i} muted={i > 0}>

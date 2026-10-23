@@ -36,15 +36,19 @@ export default function MatchScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const action = useAction();
 
-  const { data, error, loading, reload, setData } = useLoad(async () => {
-    const match = await getMatch(id);
-    const [bundle, courses] = await Promise.all([getLeague(match.league_id), listCourses()]);
-    return { match, courses, ...bundle };
-  }, [id], {
-    // Keep the scorecard live for everyone, but never overwrite a score someone is entering.
-    pollMs: 5000,
-    shouldSkip: () => pendingSaves.current > 0 || Date.now() - lastEdit.current < 4000,
-  });
+  const { data, error, loading, reload, setData } = useLoad(
+    async () => {
+      const match = await getMatch(id);
+      const [bundle, courses] = await Promise.all([getLeague(match.league_id), listCourses()]);
+      return { match, courses, ...bundle };
+    },
+    [id],
+    {
+      // Keep the scorecard live for everyone, but never overwrite a score someone is entering.
+      pollMs: 5000,
+      shouldSkip: () => pendingSaves.current > 0 || Date.now() - lastEdit.current < 4000,
+    },
+  );
 
   if (!data) {
     return (
@@ -182,7 +186,7 @@ export default function MatchScreen() {
                     <View style={{ flex: 1 }}>
                       <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(p.user_id)}</T>
                       <T variant="label" muted>
-                        {shots > 0 ? `${'•'.repeat(shots)} gets ${shots}` : ' '}
+                        {shots > 0 ? `${'•'.repeat(shots)} ${shots} HCP stroke${shots === 1 ? '' : 's'} here` : ' '}
                       </T>
                     </View>
                     <Stepper
@@ -225,22 +229,25 @@ export default function MatchScreen() {
         onPickHole={setHole}
       />
 
-      <Commentary
-        lines={buildCommentary({
-          players: match.match_players.map((p) => ({
-            userId: p.user_id,
-            name: nameOf(p.user_id),
-            holeScores: p.hole_scores,
-            courseHandicap: p.course_handicap,
-          })),
-          holes: played.holes,
-          holePars: played.holePars,
-          strokeIndex: played.strokeIndex,
-          scoring: settings.scoring,
-          holeOffset,
-        })}
-        offset={holeOffset}
-      />
+      {/* Live updates are for people watching; players in the match don't need the distraction. */}
+      {!isPlayer || match.status === 'final' ? (
+        <Commentary
+          lines={buildCommentary({
+            players: match.match_players.map((p) => ({
+              userId: p.user_id,
+              name: nameOf(p.user_id),
+              holeScores: p.hole_scores,
+              courseHandicap: p.course_handicap,
+            })),
+            holes: played.holes,
+            holePars: played.holePars,
+            strokeIndex: played.strokeIndex,
+            scoring: settings.scoring,
+            holeOffset,
+          })}
+          offset={holeOffset}
+        />
+      ) : null}
 
       {myResult ? (
         <Row style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -263,7 +270,14 @@ export default function MatchScreen() {
         </Row>
       ) : null}
 
-      <Section title={match.status === 'final' ? 'Result' : 'Standings so far'} right={<T variant="eyebrow" muted>{settings.scoring}</T>} />
+      <Section
+        title={match.status === 'final' ? 'Result' : 'Standings so far'}
+        right={
+          <T variant="eyebrow" muted>
+            {settings.scoring}
+          </T>
+        }
+      />
       <View style={{ marginTop: -space.s }}>
         {results.map((r) => {
           const p = match.match_players.find((x) => x.user_id === r.userId)!;
@@ -280,11 +294,20 @@ export default function MatchScreen() {
                 borderBottomWidth: lead ? 0 : 1,
                 borderColor: c.border,
               }}>
-              <T style={{ width: 28, textAlign: 'center', fontFamily: fonts.num, fontSize: 22, color: lead ? c.onLeader : c.text }}>
+              <T
+                style={{
+                  width: 28,
+                  textAlign: 'center',
+                  fontFamily: fonts.num,
+                  fontSize: 22,
+                  color: lead ? c.onLeader : c.text,
+                }}>
                 {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
               </T>
               <View style={{ flex: 1 }}>
-                <T style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: lead ? c.onLeader : c.text }}>{nameOf(r.userId)}</T>
+                <T style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: lead ? c.onLeader : c.text }}>
+                  {nameOf(r.userId)}
+                </T>
                 <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
                   {teeOf(p)?.name ?? ''} · CH {p.course_handicap}
                   {r.gross != null ? ` · ${r.gross} gross · ${r.net} net` : ' · no score yet'}
@@ -302,7 +325,9 @@ export default function MatchScreen() {
         </T>
       ) : null}
 
-      {settings.tiebreak === 'playoff' && editable && (tied.length > 0 || match.match_players.some((p) => p.playoff_rank != null)) ? (
+      {settings.tiebreak === 'playoff' &&
+      editable &&
+      (tied.length > 0 || match.match_players.some((p) => p.playoff_rank != null)) ? (
         <Card>
           <T variant="title">Playoff</T>
           <T variant="label" muted>
@@ -411,7 +436,17 @@ function Stepper({
  * Paper-scorecard marks from the brand book: birdie circled in red, eagle double circle,
  * bogey square, double bogey (or worse) double square, par plain.
  */
-function ScoreMark({ score, par, size = 24, fontSize = 16 }: { score: number | null; par: number | null; size?: number; fontSize?: number }) {
+function ScoreMark({
+  score,
+  par,
+  size = 24,
+  fontSize = 16,
+}: {
+  score: number | null;
+  par: number | null;
+  size?: number;
+  fontSize?: number;
+}) {
   const c = usePalette();
   const diff = score != null && par != null ? score - par : 0;
   const red = diff < 0;
@@ -474,7 +509,9 @@ function Scorecard({
       {blocks.map((start) => {
         const cols = [...Array(9).keys()].map((k) => start + k);
         return (
-          <View key={start} style={{ borderWidth: 1, borderColor: c.border, borderRadius: radius.input, overflow: 'hidden' }}>
+          <View
+            key={start}
+            style={{ borderWidth: 1, borderColor: c.border, borderRadius: radius.input, overflow: 'hidden' }}>
             <Row style={{ gap: 0, backgroundColor: c.surface, height: 26 }}>
               <View style={{ width: nameW, paddingLeft: space.s }}>
                 <T variant="eyebrow" muted>
@@ -590,7 +627,12 @@ function Bonuses({
       {bonuses.map((b) => (
         <Row
           key={b.id}
-          style={{ justifyContent: 'space-between', backgroundColor: c.bg, borderRadius: radius.input, padding: space.m }}>
+          style={{
+            justifyContent: 'space-between',
+            backgroundColor: c.bg,
+            borderRadius: radius.input,
+            padding: space.m,
+          }}>
           <View style={{ flex: 1 }}>
             <T>
               {b.label}
@@ -621,17 +663,32 @@ function Bonuses({
           </T>
           <Row style={{ flexWrap: 'wrap' }}>
             {types.map((t) => (
-              <Chip key={t.key} label={`${t.label} +${t.points}`} on={typeKey === t.key} onPress={() => setTypeKey(t.key)} />
+              <Chip
+                key={t.key}
+                label={`${t.label} +${t.points}`}
+                on={typeKey === t.key}
+                onPress={() => setTypeKey(t.key)}
+              />
             ))}
             <Chip label="Custom" on={typeKey === null} onPress={() => setTypeKey(null)} />
           </Row>
           {typeKey === null ? (
             <Row style={{ alignItems: 'flex-start' }}>
               <View style={{ flex: 2 }}>
-                <Field label="What happened" value={customLabel} onChangeText={setCustomLabel} placeholder="e.g. Drove the green" />
+                <Field
+                  label="What happened"
+                  value={customLabel}
+                  onChangeText={setCustomLabel}
+                  placeholder="e.g. Drove the green"
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Field label="Points" value={customPoints} onChangeText={setCustomPoints} keyboardType="numbers-and-punctuation" />
+                <Field
+                  label="Points"
+                  value={customPoints}
+                  onChangeText={setCustomPoints}
+                  keyboardType="numbers-and-punctuation"
+                />
               </View>
             </Row>
           ) : null}
@@ -652,7 +709,7 @@ function Commentary({ lines, offset }: { lines: CommentaryLine[]; offset: number
   const shown = all ? lines : lines.slice(0, 6);
   return (
     <Card>
-      <T variant="h2">Commentary</T>
+      <T variant="h2">Live updates</T>
       {shown.map((l, i) => (
         <Row key={i} style={{ alignItems: 'flex-start' }}>
           <T variant="label" muted style={{ width: 32, paddingTop: 3 }}>
