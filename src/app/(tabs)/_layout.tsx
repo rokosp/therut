@@ -7,6 +7,7 @@ import { anyLiveMatch, getProfile, listFriendships, listNotifications } from '@/
 import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
 import { BackButton } from '@/ui/BackButton';
+import { LiveDot } from '@/ui/LiveDot';
 import { Avatar, HeaderTitle, Row, T } from '@/ui/components';
 import { brand, fonts, space, usePalette } from '@/ui/theme';
 
@@ -102,12 +103,7 @@ export default function TabsLayout() {
                 style={{ fontFamily: fonts.mono, fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase', color }}>
                 Matches
               </T>
-              {me?.live ? (
-                <View
-                  accessibilityLabel="A match is live"
-                  style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: brand.birdie }}
-                />
-              ) : null}
+              {me?.live ? <LiveDot /> : null}
             </Row>
           ),
           headerLeft: () => <BackButton home />,
