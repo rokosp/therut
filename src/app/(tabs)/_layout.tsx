@@ -6,7 +6,7 @@ import { getProfile, listFriendships } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
 import { BackButton } from '@/ui/BackButton';
-import { Avatar, HeaderTitle } from '@/ui/components';
+import { Avatar, HeaderTitle, T } from '@/ui/components';
 import { fonts, usePalette } from '@/ui/theme';
 
 export default function TabsLayout() {
@@ -55,7 +55,18 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="matches"
-        options={{ title: 'Matches', tabBarLabel: 'Matches', headerLeft: () => <BackButton home /> }}
+        options={{
+          title: 'Matches',
+          tabBarLabel: 'Matches',
+          headerLeft: () => <BackButton home />,
+          headerRight: () => (
+            <Pressable onPress={() => router.push('/calendar')} hitSlop={12} style={{ marginRight: 16 }}>
+              <T variant="eyebrow" style={{ color: c.accentText, fontSize: 11 }}>
+                Calendar
+              </T>
+            </Pressable>
+          ),
+        }}
       />
       <Tabs.Screen
         name="profile"
