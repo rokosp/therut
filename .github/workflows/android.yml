@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: android-apk
@@ -65,3 +66,8 @@ jobs:
             --title "The Rut (latest test build)" \
             --notes "Built from ${GITHUB_SHA::7}. Download the-rut.apk on an Android phone and open it to install." \
             --prerelease
+
+      - name: Refresh the website copy of the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run web.yml --repo ${{ github.repository }} --ref main

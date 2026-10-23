@@ -30,6 +30,12 @@ jobs:
           CI: 1
       # Let deep links like /therut/league/123 load the app instead of a GitHub 404.
       - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
+      # Also serve the Android install file from the site, since some phones stall on GitHub release downloads.
+      # https://rokosp.github.io/therut/the-rut.apk
+      - name: Copy the latest APK into the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download latest --repo ${{ github.repository }} --pattern the-rut.apk --dir dist || echo "No APK release yet"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
