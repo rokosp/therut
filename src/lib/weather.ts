@@ -17,7 +17,7 @@ export function weatherKind(code: number, wind: number): WeatherKind {
   if (code === 45 || code === 48) return 'fog';
   if (code >= 51) return 'rain';
   if (wind >= 30) return 'wind';
-  return code <= 1 ? 'sunny' : 'cloudy';
+  return code === 0 ? 'sunny' : 'cloudy';
 }
 
 function describe(code: number): string {
