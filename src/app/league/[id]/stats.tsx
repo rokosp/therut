@@ -90,7 +90,11 @@ export default function SeasonStats() {
               return (
                 <Pressable key={r.userId} style={{ flex: 1 }} onPress={() => router.push(`/player/${r.userId}`)}>
                   <View style={{ alignItems: 'center', gap: 4, marginBottom: space.s }}>
-                    <Avatar name={nameOf(r.userId)} size={first ? 52 : 40} />
+                    <Avatar
+                      name={nameOf(r.userId)}
+                      size={first ? 52 : 40}
+                      url={members.find((m) => m.user_id === r.userId)?.profiles.avatar_url}
+                    />
                     <T numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: first ? 17 : 15 }}>
                       {nameOf(r.userId)}
                     </T>

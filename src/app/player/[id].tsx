@@ -66,7 +66,7 @@ export default function PlayerScreen() {
     <Screen refreshing={loading} onRefresh={reload}>
       <Stack.Screen options={{ title: 'Player' }} />
       <Row style={{ gap: space.m }}>
-        <Avatar name={name} size={56} />
+        <Avatar name={name} size={56} url={profile.avatar_url} />
         <View style={{ flex: 1 }}>
           <T variant="h1" style={{ fontSize: 32, lineHeight: 32 }}>
             {name}

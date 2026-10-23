@@ -119,7 +119,7 @@ function PlayerRow({
   return (
     <Row style={{ minHeight: 52, borderBottomWidth: 1, borderColor: c.border, paddingVertical: space.xs }}>
       <Pressable onPress={onPress} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.m }}>
-        <Avatar name={displayName(profile)} size={36} />
+        <Avatar name={displayName(profile)} size={36} url={profile.avatar_url} />
         <View style={{ flex: 1 }}>
           <T style={{ fontFamily: fonts.bodyBold }}>{displayName(profile)}</T>
           <T variant="label" muted>

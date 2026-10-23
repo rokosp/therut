@@ -2,13 +2,26 @@ import { router } from 'expo-router';
 import { Tabs } from 'expo-router/tabs';
 import { Pressable } from 'react-native';
 
+import { getProfile, listFriendships } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useLoad } from '@/lib/useLoad';
 import { Avatar, HeaderTitle } from '@/ui/components';
 import { fonts, usePalette } from '@/ui/theme';
 
 export default function TabsLayout() {
   const c = usePalette();
-  const { session } = useAuth();
+  const { session, userId } = useAuth();
+  // My photo for the header, and how many friend requests are waiting (shown on the Profile tab).
+  const { data: me } = useLoad(
+    async () => {
+      const [profile, friendships] = await Promise.all([getProfile(userId!), listFriendships()]);
+      const requests = friendships.filter((f) => f.status === 'pending' && f.addressee === userId).length;
+      return { avatar: profile.avatar_url ?? null, requests };
+    },
+    [userId],
+    { pollMs: 30000 },
+  );
+  const requests = me?.requests ?? 0;
   const name = (session?.user.user_metadata?.display_name as string | undefined) ?? session?.user.email ?? '?';
   return (
     <Tabs
@@ -34,13 +47,16 @@ export default function TabsLayout() {
           tabBarLabel: 'League',
           headerRight: () => (
             <Pressable onPress={() => router.navigate('/profile')} hitSlop={12} style={{ marginRight: 16 }}>
-              <Avatar name={name} />
+              <Avatar name={name} url={me?.avatar} />
             </Pressable>
           ),
         }}
       />
       <Tabs.Screen name="matches" options={{ title: 'Matches', tabBarLabel: 'Matches' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarLabel: 'Profile' }} />
+      <Tabs.Screen
+        name="profile"
+        options={{ title: 'Profile', tabBarLabel: requests ? `Profile · ${requests}` : 'Profile' }}
+      />
     </Tabs>
   );
 }

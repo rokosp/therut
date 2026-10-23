@@ -16,6 +16,8 @@ export interface Profile {
   app_handicap?: number | null;
   /** On scorecards but has no account yet; a league admin can share a claim code. */
   is_guest?: boolean;
+  /** Public URL of the profile photo, if they added one. */
+  avatar_url?: string | null;
 }
 
 // app_handicap arrives with the friends migration; until that runs, fall back to the older columns.
@@ -226,6 +228,18 @@ export async function removeFriend(me: string, other: string) {
       .delete()
       .or(`and(requester.eq.${me},addressee.eq.${other}),and(requester.eq.${other},addressee.eq.${me})`),
   );
+}
+
+/** Upload a picked photo as my profile picture and save its address on my profile. */
+export async function uploadAvatar(userId: string, uri: string, mimeType = 'image/jpeg') {
+  const body = await (await fetch(uri)).arrayBuffer();
+  const ext = mimeType.includes('png') ? 'png' : 'jpg';
+  const path = `${userId}/${Date.now()}.${ext}`;
+  const up = await supabase.storage.from('avatars').upload(path, body, { contentType: mimeType, upsert: true });
+  if (up.error) throw new Error(up.error.message);
+  const url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  check(await supabase.from('profiles').update({ avatar_url: url }).eq('id', userId));
+  return url;
 }
 
 // Guest players -----------------------------------------------------------

@@ -245,8 +245,18 @@ export function Tag({ kind, label }: { kind: 'major' | 'minor' | 'bonus' | 'live
   );
 }
 
-export function Avatar({ name, size = 28 }: { name: string; size?: number }) {
+export function Avatar({ name, size = 28, url }: { name: string; size?: number; url?: string | null }) {
   const c = usePalette();
+  if (url) {
+    return (
+      <Image
+        source={{ uri: url }}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.surface }}
+        contentFit="cover"
+        accessibilityLabel={name}
+      />
+    );
+  }
   return (
     <View
       style={{

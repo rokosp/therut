@@ -30,6 +30,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 140
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The Rut uses your photos so you can pick a profile picture.",
+          "cameraPermission": "The Rut uses the camera so you can take a profile picture."
+        }
       ]
     ],
     "experiments": {

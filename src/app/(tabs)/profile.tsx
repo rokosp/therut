@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
-import { claimGuest, displayName, getProfile, handicapsFor, listCourses, playerStats, updateProfile } from '@/lib/api';
+import { claimGuest, displayName, uploadAvatar, getProfile, handicapsFor, listCourses, playerStats, updateProfile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useAction, useLoad } from '@/lib/useLoad';
@@ -20,6 +21,20 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const save = useAction();
   const claim = useAction();
+  const photo = useAction();
+  const pickPhoto = () =>
+    photo.run(async () => {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+      if (res.canceled || !res.assets[0]) return;
+      const a = res.assets[0];
+      await uploadAvatar(userId!, a.uri, a.mimeType ?? 'image/jpeg');
+      reload();
+    });
   const [claimCode, setClaimCode] = useState('');
   const [claimed, setClaimed] = useState(false);
   const [openPair, setOpenPair] = useState<string | null>(null);
@@ -58,10 +73,15 @@ export default function ProfileScreen() {
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
-      <ErrorText error={error} />
+      <ErrorText error={error ?? photo.error} />
       {data ? (
         <Row style={{ gap: space.m }}>
-          <Avatar name={displayName(data.profile)} size={56} />
+          <Pressable onPress={pickPhoto} disabled={photo.busy} style={{ alignItems: 'center', gap: 2 }}>
+            <Avatar name={displayName(data.profile)} size={64} url={data.profile.avatar_url} />
+            <T variant="eyebrow" style={{ color: c.accentText, fontSize: 10 }}>
+              {photo.busy ? 'Saving…' : data.profile.avatar_url ? 'Change' : 'Add photo'}
+            </T>
+          </Pressable>
           <View style={{ flex: 1 }}>
             <T variant="h1" style={{ fontSize: 32, lineHeight: 32 }}>
               {displayName(data.profile)}
