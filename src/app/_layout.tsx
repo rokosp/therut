@@ -54,8 +54,7 @@ function RootStack() {
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!!session}>
-          <Stack.Screen name="index" options={{ title: 'THE RUT' }} />
-          <Stack.Screen name="profile" options={{ title: 'PROFILE' }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="league/new" options={{ title: 'NEW LEAGUE', presentation: 'modal' }} />
           <Stack.Screen name="league/join" options={{ title: 'JOIN LEAGUE', presentation: 'modal' }} />
           <Stack.Screen name="league/[id]/index" options={{ title: 'LEAGUE' }} />

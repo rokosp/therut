@@ -17,6 +17,7 @@ import {
   type MatchPlayerRow,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { buildCommentary, type CommentaryLine } from '@/lib/commentary';
 import { strokesPerHole } from '@/lib/handicap';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Segmented, T } from '@/ui/components';
@@ -29,6 +30,8 @@ export default function MatchScreen() {
   const [hole, setHole] = useState(0);
   const [mode, setMode] = useState<'holes' | 'totals'>('holes');
   const saveQueue = useRef(new Map<string, Promise<void>>());
+  const pendingSaves = useRef(0);
+  const lastEdit = useRef(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const action = useAction();
 
@@ -36,7 +39,11 @@ export default function MatchScreen() {
     const match = await getMatch(id);
     const [bundle, courses] = await Promise.all([getLeague(match.league_id), listCourses()]);
     return { match, courses, ...bundle };
-  }, [id]);
+  }, [id], {
+    // Keep the scorecard live for everyone, but never overwrite a score someone is entering.
+    pollMs: 5000,
+    shouldSkip: () => pendingSaves.current > 0 || Date.now() - lastEdit.current < 4000,
+  });
 
   if (!data) {
     return (
@@ -49,7 +56,9 @@ export default function MatchScreen() {
   const { match, courses, members, settings } = data;
   const isAdmin = members.some((m) => m.user_id === userId && m.role === 'admin');
   const canManage = isAdmin || match.created_by === userId;
-  const editable = match.status === 'open' || isAdmin;
+  const isPlayer = match.match_players.some((p) => p.user_id === userId);
+  // Anyone playing (or whoever set the match up) can keep score for everyone. Others watch.
+  const editable = isAdmin || (match.status === 'open' && (isPlayer || match.created_by === userId));
   const { course, tee, played } = holesFor(match, courses);
   const nameOf = (uid: string) => displayName(members.find((m) => m.user_id === uid)?.profiles);
   const results = resultsFor(match, settings);
@@ -64,11 +73,16 @@ export default function MatchScreen() {
         match_players: match.match_players.map((p) => (p.user_id === uid ? { ...p, ...patch } : p)),
       },
     });
+    lastEdit.current = Date.now();
+    pendingSaves.current += 1;
     const prev = saveQueue.current.get(uid) ?? Promise.resolve();
     const next = prev
       .then(() => saveScore(match.id, uid, patch))
       .then(() => setSaveError(null))
-      .catch((e: Error) => setSaveError(`Couldn't save: ${e.message}. Pull down to refresh.`));
+      .catch((e: Error) => setSaveError(`Couldn't save: ${e.message}. Pull down to refresh.`))
+      .finally(() => {
+        pendingSaves.current -= 1;
+      });
     saveQueue.current.set(uid, next);
   };
 
@@ -115,6 +129,11 @@ export default function MatchScreen() {
         </T>
       </Row>
       <ErrorText error={saveError ?? error} />
+      {!editable && match.status === 'open' ? (
+        <T variant="label" style={{ color: c.danger }}>
+          ● WATCHING LIVE · scores update on their own
+        </T>
+      ) : null}
 
       {editable ? (
         <Card>
@@ -196,8 +215,25 @@ export default function MatchScreen() {
         onPickHole={setHole}
       />
 
+      <Commentary
+        lines={buildCommentary({
+          players: match.match_players.map((p) => ({
+            userId: p.user_id,
+            name: nameOf(p.user_id),
+            holeScores: p.hole_scores,
+            courseHandicap: p.course_handicap,
+          })),
+          holes: played.holes,
+          holePars: played.holePars,
+          strokeIndex: played.strokeIndex,
+          scoring: settings.scoring,
+          holeOffset,
+        })}
+        offset={holeOffset}
+      />
+
       <Card>
-        <T variant="h2">Result</T>
+        <T variant="h2">{match.status === 'final' ? 'Result' : 'Standings so far'}</T>
         {results.map((r) => {
           const p = match.match_players.find((x) => x.user_id === r.userId)!;
           return (
@@ -545,6 +581,32 @@ function Bonuses({
           <ErrorText error={err} />
           <Button title="Add bonus" kind="secondary" onPress={add} />
         </View>
+      ) : null}
+    </Card>
+  );
+}
+
+function Commentary({ lines, offset }: { lines: CommentaryLine[]; offset: number }) {
+  const c = usePalette();
+  const [all, setAll] = useState(false);
+  if (lines.length === 0) return null;
+  const color = { great: c.accentText, ouch: c.danger, lead: c.primary, hole: c.text };
+  const shown = all ? lines : lines.slice(0, 6);
+  return (
+    <Card>
+      <T variant="h2">Commentary</T>
+      {shown.map((l, i) => (
+        <Row key={i} style={{ alignItems: 'flex-start' }}>
+          <T variant="label" muted style={{ width: 32, paddingTop: 3 }}>
+            #{l.hole + 1 + offset}
+          </T>
+          <T style={{ flex: 1, color: color[l.kind], fontFamily: l.kind === 'hole' ? fonts.body : fonts.bodyBold }}>
+            {l.text}
+          </T>
+        </Row>
+      ))}
+      {lines.length > 6 ? (
+        <Button title={all ? 'Show less' : `Show all ${lines.length}`} kind="secondary" onPress={() => setAll(!all)} />
       ) : null}
     </Card>
   );

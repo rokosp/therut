@@ -1,26 +1,14 @@
-import { router, Stack } from 'expo-router';
-import { Pressable } from 'react-native';
+import { router } from 'expo-router';
 
 import { listLeagues } from '@/lib/api';
 import { useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Row, Screen, T } from '@/ui/components';
-import { fonts, usePalette } from '@/ui/theme';
 
 export default function Home() {
-  const c = usePalette();
   const { data: leagues, error, loading, reload } = useLoad(listLeagues, []);
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
-      <Stack.Screen
-        options={{
-          headerRight: () => (
-            <Pressable onPress={() => router.push('/profile')} hitSlop={12}>
-              <T style={{ fontFamily: fonts.bodyBold, color: c.accentText }}>Profile</T>
-            </Pressable>
-          ),
-        }}
-      />
       <T variant="h1">Your leagues</T>
       <ErrorText error={error} />
       {leagues?.length === 0 ? (

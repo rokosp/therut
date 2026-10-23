@@ -96,6 +96,11 @@ export async function updateProfile(id: string, patch: Partial<Omit<Profile, 'id
   check(await supabase.from('profiles').update(patch).eq('id', id));
 }
 
+export async function getProfiles(ids: string[]): Promise<Profile[]> {
+  if (ids.length === 0) return [];
+  return check(await supabase.from('profiles').select('id, display_name, nickname, self_handicap').in('id', ids));
+}
+
 // Courses -----------------------------------------------------------------
 
 export async function listCourses(): Promise<Course[]> {
@@ -236,6 +241,23 @@ export async function addBonus(b: { matchId: string; userId: string; typeKey: st
 
 export async function removeBonus(id: string) {
   check(await supabase.from('bonus_awards').delete().eq('id', id));
+}
+
+export interface LiveMatch extends MatchRow {
+  leagues: { name: string; settings: Partial<LeagueSettings> };
+}
+
+/** Matches still being played in any league I'm in, with player names. */
+export async function listLiveMatches(): Promise<{ matches: LiveMatch[]; profiles: Profile[] }> {
+  const matches = check(
+    await supabase
+      .from('matches')
+      .select(`${MATCH_SELECT}, leagues(name, settings)`)
+      .eq('status', 'open')
+      .order('played_on', { ascending: false }),
+  ) as LiveMatch[];
+  const ids = [...new Set(matches.flatMap((m) => m.match_players.map((p) => p.user_id)))];
+  return { matches, profiles: await getProfiles(ids) };
 }
 
 // Derived -----------------------------------------------------------------

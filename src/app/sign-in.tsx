@@ -1,14 +1,14 @@
-import { Image } from 'expo-image';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, useColorScheme, View } from 'react-native';
 
 import { isConfigured, supabase } from '@/lib/supabase';
 import { useAction } from '@/lib/useLoad';
 import { Button, ErrorText, Field, Screen, Segmented, T } from '@/ui/components';
-import { space, usePalette } from '@/ui/theme';
+import { brand, space, usePalette } from '@/ui/theme';
 
 export default function SignIn() {
   const c = usePalette();
+  const scheme = useColorScheme();
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -27,7 +27,11 @@ export default function SignIn() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { display_name: name.trim() } },
+          options: {
+            data: { display_name: name.trim() },
+            // If email confirmation is on, bring people back to this site instead of localhost.
+            emailRedirectTo: Platform.OS === 'web' ? window.location.origin + '/therut/' : undefined,
+          },
         });
         if (error) throw error;
         if (!data.session) setInfo('Check your email to confirm your account, then sign in.');
@@ -38,10 +42,9 @@ export default function SignIn() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen>
         <View style={{ alignItems: 'center', gap: space.s, paddingTop: space.xxxl, paddingBottom: space.l }}>
-          <View style={{ backgroundColor: c.accent, borderRadius: 999, padding: space.xl }}>
-            <Image source={require('@/assets/images/logo-mark.png')} style={{ width: 104, height: 104 }} contentFit="contain" />
-          </View>
-          <T variant="display">The Rut</T>
+          <T variant="display" style={[styles.wordmark, { color: scheme === 'dark' ? c.text : brand.pine }]}>
+            {'THE\nRUT'}
+          </T>
           <T muted>League scores for the crew</T>
         </View>
         {!isConfigured ? (
@@ -79,3 +82,7 @@ export default function SignIn() {
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  wordmark: { fontSize: 96, lineHeight: 88, textAlign: 'center', letterSpacing: 2 },
+});
