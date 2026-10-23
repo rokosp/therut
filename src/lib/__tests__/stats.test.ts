@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { careerHighlights, matchHappenings, seasonAwards, type SeasonCard } from '../stats';
+import { careerHighlights, headToHead, holeStats, matchHappenings, seasonAwards, type SeasonCard } from '../stats';
 
 const pars = [4, 3, 5, 4, 4, 3, 5, 4, 4];
 
@@ -78,5 +78,31 @@ describe('careerHighlights', () => {
     expect(c.doubles).toBe(1);
     expect(c.best9).toEqual({ gross: 37, toPar: 1 });
     expect(c.best18).toEqual({ gross: 90, toPar: 18 });
+  });
+});
+
+describe('headToHead', () => {
+  it('counts wins, losses and ties, newest first', () => {
+    const r = headToHead([
+      { matchId: 'a', playedOn: '2026-01-01', mine: 1, theirs: 2, myScore: 80, theirScore: 85, stableford: false },
+      { matchId: 'b', playedOn: '2026-02-01', mine: 2, theirs: 1, myScore: 90, theirScore: 88, stableford: false },
+      { matchId: 'c', playedOn: '2026-03-01', mine: 1, theirs: 1, myScore: 84, theirScore: 84, stableford: false },
+      { matchId: 'd', playedOn: '2026-04-01', mine: null, theirs: 1, myScore: null, theirScore: 70, stableford: false },
+    ]);
+    expect([r.wins, r.losses, r.ties]).toEqual([1, 1, 1]);
+    expect(r.last?.matchId).toBe('c');
+  });
+});
+
+describe('holeStats', () => {
+  it('averages each course hole, with back nines in the right place', () => {
+    const s = holeStats([
+      { holeNumbers: [1, 2], holeScores: [4, 6], holePars: [4, 5] },
+      { holeNumbers: [1, 2], holeScores: [6, null], holePars: [4, 5] },
+      { holeNumbers: [10, 11], holeScores: [3, 3], holePars: [3, 4] },
+    ]);
+    expect(s.map((h) => h.hole)).toEqual([1, 2, 10, 11]);
+    expect(s[0]).toMatchObject({ played: 2, average: 5, best: 4, overPar: 1 });
+    expect(s[3]).toMatchObject({ overPar: -1 });
   });
 });

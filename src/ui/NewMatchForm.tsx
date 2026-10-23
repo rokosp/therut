@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 
 import {
   createMatch,
@@ -22,12 +22,20 @@ import { courseHandicap } from '@/lib/handicap';
 import { withDefaults, type MatchFormat, type MatchKind } from '@/lib/types';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Segmented, T } from '@/ui/components';
-import { space } from '@/ui/theme';
+import { MonthGrid } from '@/ui/MonthGrid';
+import { brand, fonts, radius, space, usePalette } from '@/ui/theme';
 
 /** One tee per colour: the ladies' ratings stay saved, but the picker only shows the main set. */
 const teesOf = (c: Course) => {
   const main = c.course_tees.filter((t) => !t.name.includes('Ladies'));
   return main.length ? main : c.course_tees;
+};
+
+/** Move an HH:MM time by some minutes, staying within the day. */
+const shiftTime = (t: string, mins: number) => {
+  const [h, m] = t.split(':').map(Number);
+  const total = Math.min(23 * 60 + 50, Math.max(0, h * 60 + m + mins));
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 };
 
 const today = () => {
@@ -40,6 +48,9 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   const { userId } = useAuth();
   const [playedOn, setPlayedOn] = useState(today());
   const [teeTime, setTeeTime] = useState('09:00');
+  const [pickingDate, setPickingDate] = useState(false);
+  const [gridMonth, setGridMonth] = useState<string | null>(null);
+  const c = usePalette();
   const [courseId, setCourseId] = useState<string | null>(null);
   const [teeId, setTeeId] = useState<string | null>(null);
   const [kind, setKind] = useState<MatchKind>('major');
@@ -50,6 +61,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
 
   const [query, setQuery] = useState('');
   const [onlineNote, setOnlineNote] = useState<string | null>(null);
+  const [solo, setSolo] = useState(false);
   const online = useAction();
   const {
     data,
@@ -146,11 +158,31 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
         nine: matchShape.nine,
         players: ids.map((uid) => ({ userId: uid, teeId: players[uid] ?? teeId, courseHandicap: chFor(uid).ch })),
       });
+      if (ids.length === 1 && !later) {
+        // Teeing it up alone.
+        setSolo(true);
+        await new Promise((r) => setTimeout(r, 1800));
+        setSolo(false);
+      }
       router.replace(`/match/${matchId}`);
     });
 
   return (
     <Screen>
+      <Modal visible={solo} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 32,
+            backgroundColor: brand.rough,
+          }}>
+          <T variant="display" style={{ color: brand.blaze, textAlign: 'center' }}>
+            Okay Steven Glansberg.
+          </T>
+        </View>
+      </Modal>
       <Card>
         <T variant="title">Match type</T>
         <Segmented
@@ -182,15 +214,73 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
             ? 'Fewest strokes wins.'
             : 'Points per hole: par 2, birdie 3, eagle 4, bogey 1, worse 0. Most points wins. Needs hole-by-hole scores.'}
         </T>
-        <Field
-          label={later ? 'Date' : 'Date played'}
-          value={playedOn}
-          onChangeText={setPlayedOn}
-          placeholder="YYYY-MM-DD"
-        />
+        <T variant="eyebrow" muted>
+          {later ? 'Date' : 'Date played'}
+        </T>
+        <Pressable
+          onPress={() => setPickingDate(!pickingDate)}
+          style={{
+            minHeight: 48,
+            borderRadius: radius.input,
+            backgroundColor: c.bg,
+            paddingHorizontal: space.m,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+          <T style={{ fontSize: 16 }}>
+            {playedOn === today() ? 'Today · ' : ''}
+            {new Date(`${playedOn}T12:00:00`).toLocaleDateString('en-GB', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </T>
+          <T variant="eyebrow" style={{ color: c.accentText }}>
+            {pickingDate ? 'Done' : 'Change'}
+          </T>
+        </Pressable>
+        {pickingDate ? (
+          <MonthGrid
+            compact
+            year={+(gridMonth ?? playedOn).slice(0, 4)}
+            month={+(gridMonth ?? playedOn).slice(5, 7) - 1}
+            onStep={(d) => {
+              const base = gridMonth ?? playedOn;
+              const n = new Date(+base.slice(0, 4), +base.slice(5, 7) - 1 + d, 1);
+              setGridMonth(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-01`);
+            }}
+            selected={playedOn}
+            onPick={(d) => {
+              setPlayedOn(d);
+              setPickingDate(false);
+              setGridMonth(null);
+            }}
+          />
+        ) : null}
         {later ? (
           <>
-            <Field label="Tee time" value={teeTime} onChangeText={setTeeTime} placeholder="09:30" />
+            <T variant="eyebrow" muted>
+              Tee time
+            </T>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Button
+                title="−"
+                kind="secondary"
+                compact
+                onPress={() => setTeeTime(shiftTime(teeTime, -10))}
+                style={{ width: 56 }}
+              />
+              <T style={{ fontFamily: fonts.num, fontSize: 32 }}>{teeTime}</T>
+              <Button
+                title="+"
+                kind="secondary"
+                compact
+                onPress={() => setTeeTime(shiftTime(teeTime, 10))}
+                style={{ width: 56 }}
+              />
+            </Row>
             <T variant="label" muted>
               This is a future date, so the match is scheduled. The players get an invite and it shows under Upcoming on
               their home page. Anyone in it can start it on the day.

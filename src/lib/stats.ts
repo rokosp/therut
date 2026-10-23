@@ -234,3 +234,74 @@ export function careerHighlights(rounds: CareerRound[]): Career {
   }
   return out;
 }
+
+// Head to head and hole stats -----------------------------------------------
+
+export interface H2HMatch {
+  matchId: string;
+  playedOn: string;
+  /** Finishing positions in the match (lower is better). */
+  mine: number | null;
+  theirs: number | null;
+  /** Strokes (or Stableford points) for the margin line. */
+  myScore: number | null;
+  theirScore: number | null;
+  stableford: boolean;
+}
+
+/** My wins, losses and ties against one player, from finished matches we both played. */
+export function headToHead(ms: H2HMatch[]) {
+  let wins = 0;
+  let losses = 0;
+  let ties = 0;
+  const done = ms.filter((m) => m.mine != null && m.theirs != null).sort((a, b) => b.playedOn.localeCompare(a.playedOn));
+  for (const m of done) {
+    if (m.mine! < m.theirs!) wins += 1;
+    else if (m.mine! > m.theirs!) losses += 1;
+    else ties += 1;
+  }
+  return { wins, losses, ties, last: done[0] ?? null };
+}
+
+export interface HoleCard {
+  /** Course hole numbers (1-based, already offset for a back nine). */
+  holeNumbers: number[];
+  holeScores: (number | null)[] | null;
+  holePars: number[] | null;
+}
+
+export interface HoleStat {
+  hole: number;
+  par: number | null;
+  played: number;
+  average: number;
+  best: number;
+  overPar: number | null;
+}
+
+/** Average, best and score against par for each hole of one course. */
+export function holeStats(cards: HoleCard[]): HoleStat[] {
+  const by = new Map<number, { par: number | null; scores: number[] }>();
+  for (const c of cards) {
+    (c.holeScores ?? []).forEach((s, i) => {
+      if (s == null || s <= 0) return;
+      const n = c.holeNumbers[i];
+      const e = by.get(n) ?? { par: c.holePars?.[i] ?? null, scores: [] };
+      e.scores.push(s);
+      by.set(n, e);
+    });
+  }
+  return [...by.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([hole, e]) => {
+      const average = e.scores.reduce((a, b) => a + b, 0) / e.scores.length;
+      return {
+        hole,
+        par: e.par,
+        played: e.scores.length,
+        average: Math.round(average * 100) / 100,
+        best: Math.min(...e.scores),
+        overPar: e.par != null ? Math.round((average - e.par) * 100) / 100 : null,
+      };
+    });
+}

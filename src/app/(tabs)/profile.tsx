@@ -127,6 +127,7 @@ export default function ProfileScreen() {
         ]}
       />
       {data?.stats ? <CareerHighlights career={data.stats.career} /> : null}
+      <Button title="Stats & trends" kind="secondary" onPress={() => router.push(`/stats/${userId}`)} />
 
       <Friends />
 

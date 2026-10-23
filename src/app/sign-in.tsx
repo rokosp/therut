@@ -45,7 +45,7 @@ export default function SignIn() {
           <T variant="display" style={[styles.wordmark, { color: scheme === 'dark' ? c.text : brand.pine }]}>
             {'THE\nRUT'}
           </T>
-          <T muted>League scores for the crew</T>
+          <T muted>League scores for the boyz.</T>
         </View>
         {!isConfigured ? (
           <ErrorText error="Supabase isn't set up yet. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env." />

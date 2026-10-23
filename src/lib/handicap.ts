@@ -155,3 +155,13 @@ export function calculateHandicap(rounds: HandicapRound[]): HandicapResult {
   const { index, counting } = indexFrom(diffs);
   return { index, differentials: diffs, counting, pendingNine: pending != null };
 }
+
+/** The index after each differential, oldest first: a handicap trend for a chart. */
+export function indexTrend(diffs: RoundDifferential[]): { playedOn: string; index: number }[] {
+  const out: { playedOn: string; index: number }[] = [];
+  diffs.forEach((d, i) => {
+    const { index } = indexFrom(diffs.slice(0, i + 1));
+    if (index != null) out.push({ playedOn: d.playedOn, index });
+  });
+  return out;
+}
