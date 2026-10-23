@@ -8,6 +8,7 @@ import { useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { brand, fonts, space, usePalette, useScheme } from '@/ui/theme';
 import { WeatherLine } from '@/ui/Weather';
+import { WeatherArt } from '@/ui/WeatherArt';
 
 export default function Home() {
   const { userId } = useAuth();
@@ -55,7 +56,11 @@ export default function Home() {
               .map((p) => displayName(home!.upcoming.profiles.find((x) => x.id === p.user_id)))
               .join(', ');
             return (
-              <Card key={m.id} onPress={() => router.push(`/match/${m.id}`)}>
+              <Card key={m.id} onPress={() => router.push(`/match/${m.id}`)} style={{ overflow: 'hidden' }}>
+                <WeatherArt
+                  city={course?.city ?? course?.club_name}
+                  startsAt={m.starts_at ?? `${m.played_on}T10:00:00`}
+                />
                 <Row style={{ alignItems: 'flex-start', gap: space.m }}>
                   <View
                     style={{
@@ -72,7 +77,7 @@ export default function Home() {
                       {when.getDate()}
                     </T>
                   </View>
-                  <View style={{ flex: 1, gap: 2 }}>
+                  <View style={{ flex: 1, gap: 2, paddingRight: 90 }}>
                     <T variant="eyebrow" style={{ color: c.accentText }}>
                       {when.toLocaleDateString('en-GB', { weekday: 'long' })}
                       {m.starts_at

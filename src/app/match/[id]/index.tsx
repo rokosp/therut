@@ -28,6 +28,7 @@ import { Fireworks } from '@/ui/Fireworks';
 import { PlayerLink } from '@/ui/PlayerLink';
 import { TrashTalk } from '@/ui/TrashTalk';
 import { WeatherLine } from '@/ui/Weather';
+import { WeatherArt } from '@/ui/WeatherArt';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 export default function MatchScreen() {
@@ -162,7 +163,11 @@ export default function MatchScreen() {
             {course?.name ?? 'Match'}
           </T>
         </View>
-        <Card>
+        <Card style={{ overflow: 'hidden', paddingRight: 100 }}>
+          <WeatherArt
+            city={course?.city ?? course?.club_name}
+            startsAt={match.starts_at ?? `${match.played_on}T10:00:00`}
+          />
           <T variant="eyebrow" muted>
             Tee time
           </T>

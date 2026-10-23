@@ -1,5 +1,8 @@
 /** Tee-time forecast from Open-Meteo (free, no key). Works up to about two weeks ahead. */
+export type WeatherKind = 'sunny' | 'cloudy' | 'rain' | 'fog' | 'wind';
+
 export interface TeeWeather {
+  kind: WeatherKind;
   label: string;
   temp: number;
   rain: number | null;
@@ -8,6 +11,14 @@ export interface TeeWeather {
 
 const places = new Map<string, Promise<{ lat: number; lon: number } | null>>();
 const forecasts = new Map<string, Promise<TeeWeather | null>>();
+
+/** Which picture to draw. Strong wind wins unless it's also wet or foggy. */
+export function weatherKind(code: number, wind: number): WeatherKind {
+  if (code === 45 || code === 48) return 'fog';
+  if (code >= 51) return 'rain';
+  if (wind >= 30) return 'wind';
+  return code <= 1 ? 'sunny' : 'cloudy';
+}
 
 function describe(code: number): string {
   if (code === 0) return 'Clear';
@@ -57,11 +68,14 @@ export function teeWeather(city: string | null | undefined, startsAt: string): P
           const j = await (await fetch(url)).json();
           const i = (j.hourly?.time as string[] | undefined)?.findIndex((t) => t.startsWith(hour)) ?? -1;
           if (i < 0) return null;
+          const code = j.hourly.weather_code[i];
+          const wind = Math.round(j.hourly.wind_speed_10m[i]);
           return {
-            label: describe(j.hourly.weather_code[i]),
+            kind: weatherKind(code, wind),
+            label: wind >= 30 && code < 45 ? 'Windy' : describe(code),
             temp: Math.round(j.hourly.temperature_2m[i]),
             rain: j.hourly.precipitation_probability?.[i] ?? null,
-            wind: Math.round(j.hourly.wind_speed_10m[i]),
+            wind,
           };
         })
         .catch(() => null),
