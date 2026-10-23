@@ -18,7 +18,7 @@ import { useAuth } from '@/lib/auth';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Avatar, Button, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
-import { MatchCard } from '@/ui/MatchCard';
+import { MatchCard, PastMatchCard } from '@/ui/MatchCard';
 import { HcpCards, StatsRow } from '@/ui/PlayerBits';
 import { space } from '@/ui/theme';
 
@@ -95,9 +95,13 @@ export default function PlayerScreen() {
           />
           <Section title="Match history" />
           {full.history.matches.length === 0 ? <T muted>No matches yet.</T> : null}
-          {full.history.matches.map((m) => (
-            <MatchCard key={m.id} match={m} profiles={full.history.profiles} courses={full.courses} />
-          ))}
+          {full.history.matches.map((m) =>
+            m.status === 'final' ? (
+              <PastMatchCard key={m.id} match={m} courses={full.courses} userId={id} />
+            ) : (
+              <MatchCard key={m.id} match={m} profiles={full.history.profiles} courses={full.courses} />
+            ),
+          )}
           {id !== userId ? (
             <Button
               title="Remove friend"

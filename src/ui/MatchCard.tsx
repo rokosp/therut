@@ -61,10 +61,10 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
       <Row style={{ justifyContent: 'space-between' }}>
         <Row>
           {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
-          <Tag kind={match.kind} label={`${match.kind} · ${match.holes}`} />
+          <Tag kind={match.kind} label={match.league_id ? `${match.kind} · ${match.holes}` : `${match.holes} holes`} />
         </Row>
         <T variant="eyebrow" muted>
-          {match.leagues?.name ?? "Friend's league"} · {match.played_on}
+          {leagueLabel(match)} · {match.played_on}
         </T>
       </Row>
       <T variant="h2">{course?.name ?? 'Match'}</T>
@@ -93,6 +93,45 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
       <T variant="label" muted>
         {stableford ? 'Stableford points' : 'Stroke play, to par'} · {match.status === 'open' ? 'tap to watch' : 'tap for the card'}
       </T>
+    </Card>
+  );
+}
+
+const leagueLabel = (m: LiveMatch) => (m.league_id ? (m.leagues?.name ?? "Friend's league") : 'Casual round');
+
+/**
+ * A finished match, kept short: tags, course, and one player's score against par.
+ * Tapping opens the summary (top 3) rather than the full card.
+ */
+export function PastMatchCard({ match, courses, userId }: { match: LiveMatch; courses: Course[]; userId: string }) {
+  const c = usePalette();
+  const { course, played } = holesFor(match, courses);
+  const mine = match.match_players.find((p) => p.user_id === userId);
+  const scores = mine?.hole_scores ?? [];
+  const complete = scores.length === played.holes && scores.every((s) => s != null);
+  const gross = complete ? (scores as number[]).reduce((a, b) => a + b, 0) : (mine?.gross ?? null);
+  const pts = match.format === 'stableford' ? stablefordPoints(mine?.hole_scores, played.holePars) : null;
+  return (
+    <Card onPress={() => router.push(`/match/${match.id}/summary`)}>
+      <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1, gap: space.s }}>
+          <Row style={{ flexWrap: 'wrap' }}>
+            <Tag kind="final" label="Final" />
+            <Tag kind={match.kind} label={match.league_id ? `${match.kind} · ${match.holes}` : `${match.holes} holes`} />
+            <T variant="eyebrow" muted>
+              {leagueLabel(match)} · {match.played_on}
+            </T>
+          </Row>
+          <T variant="h2">{course?.name ?? 'Match'}</T>
+        </View>
+        <View style={{ alignItems: 'flex-end', marginLeft: space.m }}>
+          <T style={{ fontFamily: fonts.num, fontSize: 36, lineHeight: 38, color: c.text }}>{gross ?? '–'}</T>
+          <T variant="eyebrow" muted>
+            Par {played.par}
+            {pts != null ? ` · ${pts} pts` : ''}
+          </T>
+        </View>
+      </Row>
     </Card>
   );
 }

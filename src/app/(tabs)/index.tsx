@@ -41,9 +41,9 @@ export default function Home() {
       ) : null}
       {leagues?.map((l) => (
         <Card key={l.id} onPress={() => router.push(`/league/${l.id}`)}>
-          {l.season ? (
+          {l.season || l.finished_at ? (
             <T variant="eyebrow" muted>
-              Season {l.season}
+              {[l.season ? `Season ${l.season}` : null, l.finished_at ? 'Finished' : null].filter(Boolean).join(' · ')}
             </T>
           ) : null}
           <T variant="h1">{l.name}</T>

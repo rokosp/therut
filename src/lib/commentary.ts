@@ -57,7 +57,7 @@ export function buildCommentary(opts: {
       else if (par != null && g <= par - 3) lines.push({ hole: i, kind: 'great', text: `Albatross! ${p.name} makes ${g} on the par ${par} ${label}.` });
       else if (par != null && g === par - 2) lines.push({ hole: i, kind: 'great', text: `Eagle! ${p.name} makes ${g} on the par ${par} ${label}.` });
       else if (par != null && g === par - 1) lines.push({ hole: i, kind: 'great', text: `${p.name} birdies ${label}.` });
-      else if (par != null ? g >= par + 4 : g >= 9) lines.push({ hole: i, kind: 'ouch', text: `${p.name} shot a ${g} on ${label}, yikes!` });
+      else if (par != null ? g >= par + 4 : g >= 9) lines.push({ hole: i, kind: 'ouch', text: `${p.name} shot ${an(g)} ${g} on ${label}, yikes!` });
       else if (par != null && g === par + 3) lines.push({ hole: i, kind: 'ouch', text: `${p.name} takes a triple on ${label}. Shake it off.` });
     }
 
@@ -106,4 +106,9 @@ export function buildCommentary(opts: {
     }
   }
   return lines.reverse();
+}
+
+/** "an 8", "an 11", "an 18", otherwise "a". */
+export function an(n: number) {
+  return [8, 11, 18].includes(n) ? 'an' : 'a';
 }

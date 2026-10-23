@@ -2,11 +2,12 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Share, View } from 'react-native';
 
-import { displayName, getLeague, listCourses, resultsFor } from '@/lib/api';
+import { displayName, finishSeason, getLeague, listCourses, resultsFor } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { buildStandings } from '@/lib/standings';
-import { useLoad } from '@/lib/useLoad';
+import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
+import { confirmAction } from '@/ui/confirm';
 import { fonts, space, usePalette } from '@/ui/theme';
 
 type Filter = 'season' | 'major' | 'minor';
@@ -16,6 +17,7 @@ export default function LeagueScreen() {
   const { userId } = useAuth();
   const c = usePalette();
   const [filter, setFilter] = useState<Filter>('season');
+  const finishing = useAction();
 
   const { data, error, loading, reload } = useLoad(async () => {
     const [bundle, courses] = await Promise.all([getLeague(id), listCourses()]);
@@ -32,6 +34,20 @@ export default function LeagueScreen() {
 
   const { league, settings, members, matches, courses } = data;
   const isAdmin = members.some((m) => m.user_id === userId && m.role === 'admin');
+  const finished = !!league.finished_at;
+  const openCount = matches.filter((m) => m.status === 'open').length;
+  const confirmFinish = () =>
+    confirmAction(
+      'Finish the season?',
+      `${openCount ? `${openCount} match${openCount === 1 ? ' still in progress is' : 'es still in progress are'} finished as they stand. ` : ''}After this nobody can change scores, matches, bonuses or settings. This can't be undone.`,
+      'Finish season',
+      () =>
+        finishing.run(async () => {
+          await finishSeason(league.id);
+          await reload();
+          router.push(`/league/${league.id}/stats`);
+        }),
+    );
   const nameOf = (uid: string) => displayName(members.find((m) => m.user_id === uid)?.profiles);
   const finals = matches.filter((m) => m.status === 'final' && (filter === 'season' || m.kind === filter));
   const table = buildStandings(
@@ -47,7 +63,7 @@ export default function LeagueScreen() {
       <Stack.Screen
         options={{
           title: league.name,
-          headerRight: isAdmin
+          headerRight: isAdmin && !finished
             ? () => (
                 <Pressable onPress={() => router.push(`/league/${id}/settings`)} hitSlop={12}>
                   <T variant="eyebrow" style={{ color: c.accentText, fontSize: 11 }}>
@@ -59,6 +75,17 @@ export default function LeagueScreen() {
         }}
       />
       <ErrorText error={error} />
+
+      {finished ? (
+        <Card onPress={() => router.push(`/league/${id}/stats`)} style={{ backgroundColor: c.leader, borderColor: c.leader }}>
+          <T variant="eyebrow" style={{ color: c.onLeader }}>
+            Season finished · scores locked
+          </T>
+          <T variant="h1" style={{ color: c.onLeader }}>
+            See the podium →
+          </T>
+        </Card>
+      ) : null}
 
       <Segmented
         options={[
@@ -105,7 +132,12 @@ export default function LeagueScreen() {
         })}
       </View>
 
-      <Button title="+ Add match" onPress={() => router.push(`/league/${id}/new-match`)} />
+      <Row>
+        {!finished ? (
+          <Button title="+ Add match" onPress={() => router.push(`/league/${id}/new-match`)} style={{ flex: 1 }} />
+        ) : null}
+        <Button title="Season stats" kind="secondary" onPress={() => router.push(`/league/${id}/stats`)} style={{ flex: 1 }} />
+      </Row>
 
       <Section title={`Matches · ${matches.length}`} />
       {matches.length === 0 ? <T muted>No matches yet. Add the first one after your next round.</T> : null}
@@ -149,6 +181,16 @@ export default function LeagueScreen() {
           <Button title="Invite" kind="secondary" compact onPress={invite} />
         </Row>
       </Card>
+
+      {isAdmin && !finished ? (
+        <>
+          <ErrorText error={finishing.error} />
+          <Button title="Finish season" kind="danger" onPress={confirmFinish} busy={finishing.busy} />
+          <T variant="label" muted>
+            Locks the league for good and crowns the winner.
+          </T>
+        </>
+      ) : null}
     </Screen>
   );
 }

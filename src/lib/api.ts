@@ -49,6 +49,8 @@ export interface League {
   join_code: string;
   settings: Partial<LeagueSettings>;
   created_by: string;
+  /** Set once the season is finished; everything in the league is locked after that. */
+  finished_at?: string | null;
 }
 
 export interface Member {
@@ -80,7 +82,10 @@ export interface BonusRow {
 
 export interface MatchRow {
   id: string;
-  league_id: string;
+  /** Null for a casual match outside any league. */
+  league_id: string | null;
+  /** Code friends use to join (casual matches). */
+  join_code?: string | null;
   course_id: string | null;
   tee_id: string | null;
   played_on: string;
@@ -239,6 +244,12 @@ export async function updateLeague(id: string, patch: Partial<Pick<League, 'name
   check(await supabase.from('leagues').update(patch).eq('id', id));
 }
 
+/** Lock the season: open matches are finished, then nothing in the league can change. */
+export async function finishSeason(id: string) {
+  check(await supabase.from('matches').update({ status: 'final' }).eq('league_id', id).eq('status', 'open'));
+  check(await supabase.from('leagues').update({ finished_at: new Date().toISOString() }).eq('id', id));
+}
+
 export async function deleteLeague(id: string) {
   check(await supabase.from('leagues').delete().eq('id', id));
 }
@@ -283,7 +294,7 @@ export async function getMatch(id: string): Promise<MatchRow> {
 }
 
 export async function createMatch(input: {
-  leagueId: string;
+  leagueId: string | null;
   courseId: string | null;
   teeId: string | null;
   playedOn: string;
@@ -323,6 +334,25 @@ export async function createMatch(input: {
       ),
   );
   return match.id;
+}
+
+export async function joinMatch(code: string): Promise<string> {
+  return check(await supabase.rpc('join_match', { code }));
+}
+
+/**
+ * A match with what it needs to show: its league (or app defaults for a casual match),
+ * the players' profiles as members, and whether the league's season is finished.
+ */
+export async function getMatchBundle(id: string) {
+  const match = await getMatch(id);
+  if (match.league_id) {
+    const bundle = await getLeague(match.league_id);
+    return { match, ...bundle, locked: !!bundle.league.finished_at };
+  }
+  const profiles = await getProfiles(match.match_players.map((p) => p.user_id));
+  const members: Member[] = profiles.map((p) => ({ user_id: p.id, role: 'member', profiles: p }));
+  return { match, league: null, settings: withDefaults({}), members, matches: [] as MatchRow[], locked: false };
 }
 
 export async function saveScore(

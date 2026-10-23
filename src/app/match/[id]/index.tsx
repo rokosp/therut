@@ -6,8 +6,7 @@ import {
   addBonus,
   deleteMatch,
   displayName,
-  getLeague,
-  getMatch,
+  getMatchBundle,
   holesFor,
   listCourses,
   removeBonus,
@@ -19,6 +18,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { buildCommentary, type CommentaryLine } from '@/lib/commentary';
 import { stablefordHole, stablefordPoints } from '@/lib/scoring';
+import { matchHappenings, type Happening } from '@/lib/stats';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
@@ -38,9 +38,8 @@ export default function MatchScreen() {
 
   const { data, error, loading, reload, setData } = useLoad(
     async () => {
-      const match = await getMatch(id);
-      const [bundle, courses] = await Promise.all([getLeague(match.league_id), listCourses()]);
-      return { match, courses, ...bundle };
+      const [bundle, courses] = await Promise.all([getMatchBundle(id), listCourses()]);
+      return { courses, ...bundle };
     },
     [id],
     {
@@ -58,12 +57,14 @@ export default function MatchScreen() {
     );
   }
 
-  const { match, courses, members, settings } = data;
+  const { match, courses, members, settings, league, locked } = data;
+  const casual = !match.league_id;
   const isAdmin = members.some((m) => m.user_id === userId && m.role === 'admin');
-  const canManage = isAdmin || match.created_by === userId;
+  const canManage = !locked && (isAdmin || match.created_by === userId);
   const isPlayer = match.match_players.some((p) => p.user_id === userId);
   // Anyone playing (or whoever set the match up) can keep score for everyone. Others watch.
-  const editable = isAdmin || (match.status === 'open' && (isPlayer || match.created_by === userId));
+  // A finished season locks everything.
+  const editable = !locked && (isAdmin || (match.status === 'open' && (isPlayer || match.created_by === userId)));
   const { course, tee, played } = holesFor(match, courses);
   const nameOf = (uid: string) => displayName(members.find((m) => m.user_id === uid)?.profiles);
   const results = resultsFor(match, settings, courses);
@@ -116,7 +117,7 @@ export default function MatchScreen() {
     confirmAction('Delete match?', 'Scores and bonuses for this match are removed for good.', 'Delete', () =>
       action.run(async () => {
         await deleteMatch(match.id);
-        router.replace(`/league/${match.league_id}`);
+        router.replace(match.league_id ? `/league/${match.league_id}` : '/matches');
       }),
     );
 
@@ -139,12 +140,31 @@ export default function MatchScreen() {
             `Par ${played.par}`,
             tee?.name,
             formatDay(match.played_on),
+            league?.name ?? (casual ? 'Casual round' : null),
           ]
             .filter(Boolean)
             .join(' · ')}
         </T>
       </View>
       <ErrorText error={saveError ?? error} />
+      {casual && match.status === 'open' && match.join_code ? (
+        <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <T variant="eyebrow" muted>
+              Match code
+            </T>
+            <T style={{ fontFamily: fonts.num, fontSize: 26, letterSpacing: 2 }}>{match.join_code}</T>
+          </View>
+          <T variant="label" muted style={{ flex: 1, textAlign: 'right' }}>
+            Friends enter this under Matches → Join a match.
+          </T>
+        </Card>
+      ) : null}
+      {locked ? (
+        <T variant="eyebrow" muted>
+          Season finished · scores are locked
+        </T>
+      ) : null}
       {!editable && match.status === 'open' ? (
         <T variant="eyebrow" style={{ color: c.danger }}>
           ● Watching live · scores update on their own
@@ -236,8 +256,19 @@ export default function MatchScreen() {
         onPickHole={setHole}
       />
 
+      {match.status === 'final' ? (
+        <Rundown
+          summary={rundownText(results, nameOf, isStableford, played.par)}
+          happenings={matchHappenings({
+            players: match.match_players.map((p) => ({ userId: p.user_id, name: nameOf(p.user_id), holeScores: p.hole_scores })),
+            holePars: played.holePars,
+            holeOffset,
+          })}
+        />
+      ) : null}
+
       {/* Live updates are for people watching; players in the match don't need the distraction. */}
-      {!isPlayer || match.status === 'final' ? (
+      {!isPlayer && match.status === 'open' ? (
         <Commentary
           lines={buildCommentary({
             players: match.match_players.map((p) => ({
@@ -266,14 +297,16 @@ export default function MatchScreen() {
               {(isStableford ? myStableford : myResult.gross) ?? '–'}
             </T>
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <T variant="eyebrow" muted>
-              League points
-            </T>
-            <T variant="score" style={{ fontSize: 56, lineHeight: 54, color: c.accentText }}>
-              +{myResult.total}
-            </T>
-          </View>
+          {!casual ? (
+            <View style={{ alignItems: 'flex-end' }}>
+              <T variant="eyebrow" muted>
+                League points
+              </T>
+              <T variant="score" style={{ fontSize: 56, lineHeight: 54, color: c.accentText }}>
+                +{myResult.total}
+              </T>
+            </View>
+          ) : null}
         </Row>
       ) : null}
 
@@ -317,12 +350,14 @@ export default function MatchScreen() {
                 </T>
                 <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
                   {teeOf(p)?.name ?? ''}
-                  {isStableford && r.stableford != null ? ` · ${r.stableford} pts` : ''}
-                  {r.gross != null ? ` · ${r.gross} strokes` : ' · card not finished'}
+                  {isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : ''}
+                  {r.gross != null ? (casual && !isStableford ? '' : ` · ${r.gross} strokes`) : ' · card not finished'}
                   {r.bonusPoints ? ` · +${r.bonusPoints} bonus` : ''}
                 </T>
               </View>
-              <T style={{ fontFamily: fonts.num, fontSize: 28, color: lead ? c.onLeader : c.text }}>{r.total}</T>
+              <T style={{ fontFamily: fonts.num, fontSize: 28, color: lead ? c.onLeader : c.text }}>
+                {casual ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
+              </T>
             </Row>
           );
         })}
@@ -369,6 +404,7 @@ export default function MatchScreen() {
         </Card>
       ) : null}
 
+      {casual ? null : (
       <Bonuses
         editable={editable}
         canRemove={(createdBy) => isAdmin || createdBy === userId}
@@ -379,6 +415,7 @@ export default function MatchScreen() {
         onAdd={(b) => action.run(async () => (await addBonus({ matchId: match.id, ...b }), await reload()))}
         onRemove={(bid) => action.run(async () => (await removeBonus(bid), await reload()))}
       />
+      )}
 
       <ErrorText error={action.error} />
       {canManage ? (
@@ -406,7 +443,7 @@ export default function MatchScreen() {
           />
         )
       ) : null}
-      {match.status === 'open' ? (
+      {match.status === 'open' && !casual ? (
         <T variant="label" muted>
           Points count in the league table once the match is finished.
         </T>
@@ -730,6 +767,61 @@ function Commentary({ lines, offset }: { lines: CommentaryLine[]; offset: number
       ))}
       {lines.length > 6 ? (
         <Button title={all ? 'Show less' : `Show all ${lines.length}`} kind="secondary" onPress={() => setAll(!all)} />
+      ) : null}
+    </Card>
+  );
+}
+
+const toParText = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : String(n));
+
+/** One or two sentences on how the match went. */
+function rundownText(
+  results: { userId: string; position: number | null; gross: number | null; stableford: number | null; tiebreakNote: string | null }[],
+  nameOf: (id: string) => string,
+  stableford: boolean,
+  par: number,
+): string | null {
+  const done = results.filter((r) => r.position != null && (stableford ? r.stableford != null : r.gross != null));
+  if (done.length === 0) return null;
+  const score = (r: (typeof done)[number]) =>
+    stableford ? `${r.stableford} points` : `${r.gross} (${toParText(r.gross! - par)})`;
+  const firsts = done.filter((r) => r.position === 1);
+  const names = firsts.map((r) => nameOf(r.userId));
+  if (done.length === 1) return `${names[0]} went round in ${score(done[0])}.`;
+  if (firsts.length > 1) return `${names.join(' and ')} tied for the win on ${score(firsts[0])}.`;
+  const win = firsts[0];
+  const second = done.filter((r) => r.position !== 1).sort((a, b) => a.position! - b.position!)[0];
+  const gap = stableford ? second.stableford! - win.stableford! : second.gross! - win.gross!;
+  const margin = Math.abs(gap);
+  const how =
+    margin === 0
+      ? `edging ${nameOf(second.userId)}${win.tiebreakNote ? ` on ${win.tiebreakNote}` : ''}`
+      : `beating ${nameOf(second.userId)} by ${margin} ${stableford ? (margin === 1 ? 'point' : 'points') : margin === 1 ? 'stroke' : 'strokes'}`;
+  const last = done.filter((r) => r.position !== 1).sort((a, b) => b.position! - a.position!)[0];
+  const tail = done.length > 2 && last.userId !== second.userId ? ` ${nameOf(last.userId)} brought up the rear with ${score(last)}.` : '';
+  return `${nameOf(win.userId)} won with ${score(win)}, ${how}.${tail}`;
+}
+
+function Rundown({ summary, happenings }: { summary: string | null; happenings: Happening[] }) {
+  const c = usePalette();
+  if (!summary && happenings.length === 0) return null;
+  const color = { great: c.accentText, ouch: c.danger, info: c.text };
+  return (
+    <Card>
+      <T variant="h2">Rundown</T>
+      {summary ? <T>{summary}</T> : null}
+      {happenings.length ? (
+        <>
+          <T variant="eyebrow" muted style={{ marginTop: space.s }}>
+            Noted happenings
+          </T>
+          {happenings.map((h, i) => (
+            <Row key={i} style={{ alignItems: 'flex-start' }}>
+              <T style={{ width: 16, color: color[h.kind] }}>{h.kind === 'great' ? '★' : h.kind === 'ouch' ? '✕' : '·'}</T>
+              <T style={{ flex: 1, color: h.kind === 'info' ? c.text : color[h.kind], fontFamily: fonts.bodyBold }}>{h.text}</T>
+            </Row>
+          ))}
+        </>
       ) : null}
     </Card>
   );
