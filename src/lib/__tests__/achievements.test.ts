@@ -103,6 +103,7 @@ describe('computeAchievements', () => {
       leagueWins: 0,
     });
     expect(get(list, 'photo-finish').earned).toBe(true);
+    expect(get(list, 'twin').earned).toBe(false);
     expect(get(list, 'blowout').earned).toBe(false);
     expect(get(list, 'iron-man').earned).toBe(true);
     expect(get(list, 'night-owl').earned).toBe(true);

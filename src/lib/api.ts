@@ -197,6 +197,7 @@ export async function playerStats(userId: string) {
         solo: m.match_players.length === 1,
         bonuses: m.bonus_awards.filter((b) => b.user_id === userId).length,
         winMargin: winMarginOf(all, userId),
+        tiedFirst: tiedFirstOf(all, userId),
         opponents:
           m.status === 'final' && r?.position != null
             ? all
@@ -243,6 +244,14 @@ function winMarginOf(results: PlayerResult[], userId: string): number | null {
   const ranked = results.filter((x) => x.score != null).sort((a, b) => a.score! - b.score!);
   if (ranked.length < 2 || ranked[0].userId !== userId) return null;
   return ranked[1].score! - ranked[0].score!;
+}
+
+/** Level on score with at least one other player for the lowest score. */
+function tiedFirstOf(results: PlayerResult[], userId: string): boolean {
+  const scored = results.filter((x) => x.score != null);
+  const best = Math.min(...scored.map((x) => x.score!));
+  const top = scored.filter((x) => x.score === best);
+  return top.length > 1 && top.some((x) => x.userId === userId);
 }
 
 /** Local tee-off hour: the planned tee time, or when the match was started on the day itself. */

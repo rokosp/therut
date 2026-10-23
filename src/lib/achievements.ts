@@ -22,6 +22,8 @@ export interface AchRound {
   bonuses: number;
   /** Strokes (or points) ahead of second place, when won. */
   winMargin?: number | null;
+  /** Level on score with someone else for the lead (before any tie breaker). */
+  tiedFirst?: boolean;
   /** How it went against each other player in a finished match. */
   opponents?: { id: string; result: 'won' | 'lost' | 'tied' }[];
 }
@@ -189,6 +191,14 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     a('dynasty', 'Winning', '2X', 'Dynasty', 'Win 2 league seasons.', input.leagueWins, 2),
     a('photo-finish', 'Winning', '+1', 'Photo Finish', 'Win a match by a single stroke.', photoFinish),
     a('blowout', 'Winning', '+10', 'Blowout', 'Win a match by 10 or more.', blowout),
+    a(
+      'twin',
+      'Winning',
+      'TT',
+      'Twin',
+      'Tie with someone for first place.',
+      rounds.filter((r) => r.final && r.tiedFirst).length,
+    ),
     a('nemesis', 'Winning', 'NS', 'Nemesis Slayer', 'Beat the player who has beaten you the most.', slayed),
     a('comeback', 'Winning', 'CB', 'Comeback Kid', 'Win a match with a double bogey or worse on your card.', comeback),
 
