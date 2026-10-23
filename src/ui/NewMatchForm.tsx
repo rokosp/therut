@@ -30,12 +30,16 @@ const teesOf = (c: Course) => {
   return main.length ? main : c.course_tees;
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 /** Set up a match: in a league (leagueId), or a casual round with friends (leagueId null). */
 export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   const { userId } = useAuth();
   const [playedOn, setPlayedOn] = useState(today());
+  const [teeTime, setTeeTime] = useState('09:00');
   const [courseId, setCourseId] = useState<string | null>(null);
   const [teeId, setTeeId] = useState<string | null>(null);
   const [kind, setKind] = useState<MatchKind>('major');
@@ -47,9 +51,19 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   const [query, setQuery] = useState('');
   const [onlineNote, setOnlineNote] = useState<string | null>(null);
   const online = useAction();
-  const { data, error: loadError, reload } = useLoad(async () => {
-    const [bundle, courses] = await Promise.all([leagueId ? getLeague(leagueId) : casualBundle(userId!), listCourses()]);
-    const hcps = await handicapsFor(bundle.members.map((m) => m.user_id), courses);
+  const {
+    data,
+    error: loadError,
+    reload,
+  } = useLoad(async () => {
+    const [bundle, courses] = await Promise.all([
+      leagueId ? getLeague(leagueId) : casualBundle(userId!),
+      listCourses(),
+    ]);
+    const hcps = await handicapsFor(
+      bundle.members.map((m) => m.user_id),
+      courses,
+    );
     return { ...bundle, courses, hcps };
   }, [leagueId, userId]);
 
@@ -73,18 +87,22 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   }
 
   const { courses, members, settings, hcps } = data;
+  // A date after today means planning ahead rather than playing now.
+  const later = /^\d{4}-\d{2}-\d{2}$/.test(playedOn) && playedOn > today();
   const course = courses.find((c) => c.id === courseId) ?? null;
   const q = query.trim().toLowerCase();
   const matching = q
     ? courses.filter((c) => [c.name, c.club_name, c.city ?? ''].some((x) => x.toLowerCase().includes(q)))
     : courses;
   // Keep the picked course visible, then the matches (a handful when nothing is typed).
-  const shownCourses = [
-    ...(course ? [course] : []),
-    ...matching.filter((c) => c.id !== courseId).slice(0, q ? 12 : 5),
-  ];
+  const shownCourses = [...(course ? [course] : []), ...matching.filter((c) => c.id !== courseId).slice(0, q ? 12 : 5)];
   const holes: 9 | 18 = kind === 'major' ? 18 : 9;
-  const matchShape = { holes, nine: holes === 9 && course?.holes === 18 ? nine : null, course_id: courseId, tee_id: teeId };
+  const matchShape = {
+    holes,
+    nine: holes === 9 && course?.holes === 18 ? nine : null,
+    course_id: courseId,
+    tee_id: teeId,
+  };
 
   const chFor = (uid: string) => {
     const m = members.find((x) => x.user_id === uid);
@@ -112,6 +130,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   const create = () =>
     run(async () => {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(playedOn)) throw new Error('Date should look like 2026-10-23.');
+      if (later && !/^\d{1,2}:\d{2}$/.test(teeTime.trim())) throw new Error('Tee time should look like 09:30.');
       const ids = Object.keys(players);
       if (leagueId && ids.length < 2) throw new Error('Pick at least two players.');
       if (ids.length < 1) throw new Error('Pick at least one player.');
@@ -120,6 +139,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
         courseId,
         teeId,
         playedOn,
+        startsAt: later ? new Date(`${playedOn}T${teeTime.trim().padStart(5, '0')}:00`).toISOString() : null,
         kind,
         format: format ?? settings.defaultFormat,
         holes,
@@ -162,7 +182,21 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
             ? 'Fewest strokes wins.'
             : 'Points per hole: par 2, birdie 3, eagle 4, bogey 1, worse 0. Most points wins. Needs hole-by-hole scores.'}
         </T>
-        <Field label="Date played" value={playedOn} onChangeText={setPlayedOn} placeholder="YYYY-MM-DD" />
+        <Field
+          label={later ? 'Date' : 'Date played'}
+          value={playedOn}
+          onChangeText={setPlayedOn}
+          placeholder="YYYY-MM-DD"
+        />
+        {later ? (
+          <>
+            <Field label="Tee time" value={teeTime} onChangeText={setTeeTime} placeholder="09:30" />
+            <T variant="label" muted>
+              This is a future date, so the match is scheduled. The players get an invite and it shows under Upcoming on
+              their home page. Anyone in it can start it on the day.
+            </T>
+          </>
+        ) : null}
       </Card>
 
       <Card>
@@ -293,7 +327,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
       })}
 
       <ErrorText error={error} />
-      <Button title="Start match" kind="accent" onPress={create} busy={busy} />
+      <Button title={later ? 'Schedule match' : 'Start match'} kind="accent" onPress={create} busy={busy} />
     </Screen>
   );
 }

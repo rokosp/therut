@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { Tabs } from 'expo-router/tabs';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { getProfile, listFriendships } from '@/lib/api';
+import { getProfile, listFriendships, listNotifications } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
 import { BackButton } from '@/ui/BackButton';
-import { Avatar, HeaderTitle, T } from '@/ui/components';
-import { fonts, usePalette } from '@/ui/theme';
+import { Avatar, HeaderTitle, Row, T } from '@/ui/components';
+import { fonts, space, usePalette } from '@/ui/theme';
 
 export default function TabsLayout() {
   const c = usePalette();
@@ -15,9 +15,13 @@ export default function TabsLayout() {
   // My photo for the header, and how many friend requests are waiting (shown on the Profile tab).
   const { data: me } = useLoad(
     async () => {
-      const [profile, friendships] = await Promise.all([getProfile(userId!), listFriendships()]);
+      const [profile, friendships, notes] = await Promise.all([
+        getProfile(userId!),
+        listFriendships(),
+        listNotifications(),
+      ]);
       const requests = friendships.filter((f) => f.status === 'pending' && f.addressee === userId).length;
-      return { avatar: profile.avatar_url ?? null, requests };
+      return { avatar: profile.avatar_url ?? null, requests, unread: notes.filter((n) => !n.read_at).length };
     },
     [userId],
     { pollMs: 30000 },
@@ -47,9 +51,35 @@ export default function TabsLayout() {
           title: 'The Rut',
           tabBarLabel: 'Leagues',
           headerRight: () => (
-            <Pressable onPress={() => router.navigate('/profile')} hitSlop={12} style={{ marginRight: 16 }}>
-              <Avatar name={name} url={me?.avatar} />
-            </Pressable>
+            <Row style={{ marginRight: 16, gap: space.m }}>
+              <Pressable onPress={() => router.push('/notifications')} hitSlop={12} accessibilityLabel="Notifications">
+                <T variant="eyebrow" style={{ color: c.accentText, fontSize: 11 }}>
+                  Inbox
+                </T>
+                {me?.unread ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -8,
+                      minWidth: 16,
+                      height: 16,
+                      borderRadius: 8,
+                      paddingHorizontal: 3,
+                      backgroundColor: c.danger,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <T style={{ color: '#fff', fontSize: 10, lineHeight: 12, fontFamily: fonts.bodyBold }}>
+                      {me.unread}
+                    </T>
+                  </View>
+                ) : null}
+              </Pressable>
+              <Pressable onPress={() => router.navigate('/profile')} hitSlop={12}>
+                <Avatar name={name} url={me?.avatar} />
+              </Pressable>
+            </Row>
           ),
         }}
       />

@@ -57,23 +57,23 @@ export default function LeagueScreen() {
     finals.map((m) => resultsFor(m, settings, courses)),
   );
 
-  const invite = () =>
-    Share.share({ message: `Join "${league.name}" on The Rut. League code: ${league.join_code}` });
+  const invite = () => Share.share({ message: `Join "${league.name}" on The Rut. League code: ${league.join_code}` });
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
       <Stack.Screen
         options={{
           title: league.name,
-          headerRight: isAdmin && !finished
-            ? () => (
-                <Pressable onPress={() => router.push(`/league/${id}/settings`)} hitSlop={12}>
-                  <T variant="eyebrow" style={{ color: c.accentText, fontSize: 11 }}>
-                    Settings
-                  </T>
-                </Pressable>
-              )
-            : undefined,
+          headerRight:
+            isAdmin && !finished
+              ? () => (
+                  <Pressable onPress={() => router.push(`/league/${id}/settings`)} hitSlop={12}>
+                    <T variant="eyebrow" style={{ color: c.accentText, fontSize: 11 }}>
+                      Settings
+                    </T>
+                  </Pressable>
+                )
+              : undefined,
         }}
       />
       {league.season ? (
@@ -84,7 +84,9 @@ export default function LeagueScreen() {
       <ErrorText error={error} />
 
       {finished ? (
-        <Card onPress={() => router.push(`/league/${id}/stats`)} style={{ backgroundColor: c.leader, borderColor: c.leader }}>
+        <Card
+          onPress={() => router.push(`/league/${id}/stats`)}
+          style={{ backgroundColor: c.leader, borderColor: c.leader }}>
           <T variant="eyebrow" style={{ color: c.onLeader }}>
             Season finished · scores locked
           </T>
@@ -112,28 +114,30 @@ export default function LeagueScreen() {
           const sharedRank = table.filter((x) => x.rank === r.rank).length > 1;
           return (
             <Pressable key={r.userId} onPress={() => router.push(`/player/${r.userId}`)}>
-            <Row
-              style={{
-                paddingHorizontal: space.l,
-                paddingVertical: space.m,
-                gap: space.m,
-                borderBottomWidth: 1,
-                borderColor: lead ? c.leader : c.border,
-                backgroundColor: lead ? c.leader : undefined,
-              }}>
-              <T style={{ width: 24, textAlign: 'center', fontFamily: fonts.num, fontSize: 22, color: fg }}>{r.rank}</T>
-              <View style={{ flex: 1 }}>
-                <Row style={{ gap: 6 }}>
-                  <T style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: fg }}>{nameOf(r.userId)}</T>
-                  {sharedRank ? <Tag kind={lead ? 'minor' : 'final'} label="Tied" /> : null}
-                </Row>
-                <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
-                  {r.played} round{r.played === 1 ? '' : 's'} · {r.wins} win{r.wins === 1 ? '' : 's'}
-                  {r.bonusPoints ? ` · +${r.bonusPoints} bonus` : ''}
+              <Row
+                style={{
+                  paddingHorizontal: space.l,
+                  paddingVertical: space.m,
+                  gap: space.m,
+                  borderBottomWidth: 1,
+                  borderColor: lead ? c.leader : c.border,
+                  backgroundColor: lead ? c.leader : undefined,
+                }}>
+                <T style={{ width: 24, textAlign: 'center', fontFamily: fonts.num, fontSize: 22, color: fg }}>
+                  {r.rank}
                 </T>
-              </View>
-              <T style={{ fontFamily: fonts.num, fontSize: 28, color: fg }}>{r.total}</T>
-            </Row>
+                <View style={{ flex: 1 }}>
+                  <Row style={{ gap: 6 }}>
+                    <T style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: fg }}>{nameOf(r.userId)}</T>
+                    {sharedRank ? <Tag kind={lead ? 'minor' : 'final'} label="Tied" /> : null}
+                  </Row>
+                  <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
+                    {r.played} round{r.played === 1 ? '' : 's'} · {r.wins} win{r.wins === 1 ? '' : 's'}
+                    {r.bonusPoints ? ` · +${r.bonusPoints} bonus` : ''}
+                  </T>
+                </View>
+                <T style={{ fontFamily: fonts.num, fontSize: 28, color: fg }}>{r.total}</T>
+              </Row>
             </Pressable>
           );
         })}
@@ -143,7 +147,12 @@ export default function LeagueScreen() {
         {!finished ? (
           <Button title="+ Add match" onPress={() => router.push(`/league/${id}/new-match`)} style={{ flex: 1 }} />
         ) : null}
-        <Button title="Season stats" kind="secondary" onPress={() => router.push(`/league/${id}/stats`)} style={{ flex: 1 }} />
+        <Button
+          title="Season stats"
+          kind="secondary"
+          onPress={() => router.push(`/league/${id}/stats`)}
+          style={{ flex: 1 }}
+        />
       </Row>
 
       <Section
@@ -164,10 +173,16 @@ export default function LeagueScreen() {
               <Tag kind="final" label={m.format === 'stableford' ? 'Stableford' : 'Stroke play'} />
               {m.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
               {m.status === 'open' ? <Tag kind="live" label="● Live" /> : null}
+              {m.status === 'scheduled' ? <Tag kind="bonus" label="Upcoming" /> : null}
             </Row>
             <T variant="h2">{course?.name ?? 'Match'}</T>
             <T variant="label" muted>
-              {m.played_on} · {m.status === 'final' ? `Won by ${winners.join(' & ') || '–'}` : 'In progress'}
+              {m.played_on} ·{' '}
+              {m.status === 'final'
+                ? `Won by ${winners.join(' & ') || '–'}`
+                : m.status === 'scheduled'
+                  ? 'Upcoming'
+                  : 'In progress'}
             </T>
           </Card>
         );

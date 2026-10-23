@@ -39,8 +39,8 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
       const sf = stablefordPoints(p.hole_scores, played.holePars) ?? 0;
       return { id: p.user_id, thru, total, toPar, sf };
     })
-    .sort((a, b) =>
-      (stableford ? b.sf - a.sf : played.holePars ? a.toPar - b.toPar : a.total - b.total) || b.thru - a.thru,
+    .sort(
+      (a, b) => (stableford ? b.sf - a.sf : played.holePars ? a.toPar - b.toPar : a.total - b.total) || b.thru - a.thru,
     );
 
   const feed = buildCommentary({
@@ -63,7 +63,13 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
     <Card onPress={() => router.push(`/match/${match.id}`)}>
       <Row style={{ justifyContent: 'space-between' }}>
         <Row>
-          {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
+          {match.status === 'open' ? (
+            <Tag kind="live" label="● Live" />
+          ) : match.status === 'scheduled' ? (
+            <Tag kind="bonus" label="Upcoming" />
+          ) : (
+            <Tag kind="final" label="Final" />
+          )}
           <Tag kind={match.kind} label={match.league_id ? `${match.kind} · ${match.holes}` : `${match.holes} holes`} />
         </Row>
         <T variant="eyebrow" muted>
@@ -96,13 +102,19 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
         </View>
       ) : null}
       <T variant="label" muted>
-        {stableford ? 'Stableford points' : 'Stroke play, to par'} · {match.status === 'open' ? 'tap to watch' : 'tap for the card'}
+        {stableford ? 'Stableford points' : 'Stroke play, to par'} ·{' '}
+        {match.status === 'open'
+          ? 'tap to watch'
+          : match.status === 'scheduled'
+            ? 'tap for details'
+            : 'tap for the card'}
       </T>
     </Card>
   );
 }
 
-const leagueLabel = (m: LiveMatch) => (m.league_id ? (m.leagues ? leagueTitle(m.leagues) : "Friend's league") : 'Casual round');
+const leagueLabel = (m: LiveMatch) =>
+  m.league_id ? (m.leagues ? leagueTitle(m.leagues) : "Friend's league") : 'Casual round';
 
 /**
  * A finished match, kept short: tags, course, and one player's score against par.
@@ -133,7 +145,10 @@ export function PastMatchCard({
         <View style={{ flex: 1, gap: space.s }}>
           <Row style={{ flexWrap: 'wrap' }}>
             <Tag kind="final" label="Final" />
-            <Tag kind={match.kind} label={match.league_id ? `${match.kind} · ${match.holes}` : `${match.holes} holes`} />
+            <Tag
+              kind={match.kind}
+              label={match.league_id ? `${match.kind} · ${match.holes}` : `${match.holes} holes`}
+            />
             <T variant="eyebrow" muted>
               {leagueLabel(match)} · {match.played_on}
             </T>
@@ -165,7 +180,8 @@ function TopThree({ match, courses, profiles }: { match: LiveMatch; courses: Cou
     <View style={{ borderTopWidth: 1, borderColor: c.border, paddingTop: space.s, gap: space.xs }}>
       {top.map((r) => (
         <Row key={r.userId} style={{ minHeight: 36 }}>
-          <T style={{ width: 28, fontFamily: fonts.num, fontSize: 20, color: r.position === 1 ? c.accentText : c.text }}>
+          <T
+            style={{ width: 28, fontFamily: fonts.num, fontSize: 20, color: r.position === 1 ? c.accentText : c.text }}>
             {`${r.tied ? 'T' : ''}${r.position}`}
           </T>
           <PlayerLink id={r.userId} style={{ flex: 1 }}>

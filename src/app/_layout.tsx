@@ -69,6 +69,7 @@ function RootStack() {
           <Stack.Screen name="league/[id]/stats" options={{ title: 'Season stats' }} />
           <Stack.Screen name="player/[id]" options={{ title: 'Player' }} />
           <Stack.Screen name="calendar" options={{ title: 'Calendar' }} />
+          <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
         </Stack.Protected>
       </Stack>
     </>

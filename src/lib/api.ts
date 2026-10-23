@@ -103,7 +103,10 @@ export interface MatchRow {
   format?: MatchFormat | null;
   holes: 9 | 18;
   nine: 'front' | 'back' | null;
-  status: 'open' | 'final';
+  /** scheduled = planned for later, open = being played, final = finished. */
+  status: 'scheduled' | 'open' | 'final';
+  /** Tee time for a scheduled match. */
+  starts_at?: string | null;
   notes: string | null;
   created_by: string;
   match_players: MatchPlayerRow[];
@@ -370,6 +373,8 @@ export async function createMatch(input: {
   holes: 9 | 18;
   nine: 'front' | 'back' | null;
   players: { userId: string; teeId: string | null; courseHandicap: number }[];
+  /** Set for a match planned ahead: it starts as "scheduled" and players get an invite. */
+  startsAt?: string | null;
 }): Promise<string> {
   const row: Record<string, unknown> = {
     league_id: input.leagueId,
@@ -381,6 +386,10 @@ export async function createMatch(input: {
     holes: input.holes,
     nine: input.nine,
   };
+  if (input.startsAt) {
+    row.status = 'scheduled';
+    row.starts_at = input.startsAt;
+  }
   let res = await supabase.from('matches').insert(row).select('id').single();
   if (res.error?.message.includes('format') && input.format === 'stroke') {
     // Database hasn't had the match format update yet; stroke play is the default anyway.
@@ -428,6 +437,53 @@ export async function saveScore(
   patch: Partial<Pick<MatchPlayerRow, 'hole_scores' | 'gross' | 'playoff_rank' | 'course_handicap' | 'tee_id'>>,
 ) {
   check(await supabase.from('match_players').update(patch).eq('match_id', matchId).eq('user_id', userId));
+}
+
+export async function startMatch(id: string) {
+  check(await supabase.rpc('start_match', { m: id }));
+}
+
+/** Scheduled matches I'm playing in, soonest first. */
+export async function listUpcoming(userId: string): Promise<{ matches: LiveMatch[]; profiles: Profile[] }> {
+  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as { match_id: string }[];
+  if (mine.length === 0) return { matches: [], profiles: [] };
+  const matches = check(
+    await supabase
+      .from('matches')
+      .select(`${MATCH_SELECT}, leagues(name, season, settings)`)
+      .eq('status', 'scheduled')
+      .in(
+        'id',
+        mine.map((m) => m.match_id),
+      )
+      .order('played_on', { ascending: true }),
+  ) as LiveMatch[];
+  matches.sort((a, b) => (a.starts_at ?? a.played_on).localeCompare(b.starts_at ?? b.played_on));
+  const ids = [...new Set(matches.flatMap((m) => m.match_players.map((p) => p.user_id)))];
+  return { matches, profiles: await getProfiles(ids) };
+}
+
+// Notifications ------------------------------------------------------------
+
+export interface AppNotification {
+  id: string;
+  kind: 'invite' | 'live';
+  title: string;
+  body: string | null;
+  match_id: string | null;
+  created_at: string;
+  read_at: string | null;
+}
+
+export async function listNotifications(): Promise<AppNotification[]> {
+  const res = await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
+  // Before the notifications update has run, just show none.
+  if (res.error) return [];
+  return res.data as AppNotification[];
+}
+
+export async function markNotificationsRead() {
+  await supabase.from('notifications').update({ read_at: new Date().toISOString() }).is('read_at', null);
 }
 
 export async function setMatchStatus(id: string, status: 'open' | 'final') {

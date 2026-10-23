@@ -14,6 +14,7 @@ import {
   resultsFor,
   saveScore,
   setMatchStatus,
+  startMatch,
   type MatchPlayerRow,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -127,6 +128,76 @@ export default function MatchScreen() {
         router.replace(match.league_id ? `/league/${match.league_id}` : '/matches');
       }),
     );
+
+  if (match.status === 'scheduled') {
+    const canStart = !locked && (isPlayer || match.created_by === userId || isAdmin);
+    const when = match.starts_at ? new Date(match.starts_at) : new Date(`${match.played_on}T12:00:00`);
+    return (
+      <Screen refreshing={loading} onRefresh={reload}>
+        <Stack.Screen options={{ title: 'Upcoming match' }} />
+        <View style={{ gap: space.s }}>
+          <Row style={{ flexWrap: 'wrap' }}>
+            <Tag kind="bonus" label="Upcoming" />
+            <Tag kind={match.kind} label={casual ? `${match.holes} holes` : `${match.kind} · ${match.holes}`} />
+            <Tag kind="final" label={isStableford ? 'Stableford' : 'Stroke play'} />
+          </Row>
+          <T variant="eyebrow" style={{ color: c.accentText }}>
+            {league ? leagueTitle(league) : 'Casual round'}
+          </T>
+          <T variant="display" style={{ fontSize: 40, lineHeight: 40 }}>
+            {course?.name ?? 'Match'}
+          </T>
+        </View>
+        <Card>
+          <T variant="eyebrow" muted>
+            Tee time
+          </T>
+          <T variant="h1">{when.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</T>
+          {match.starts_at ? (
+            <T style={{ fontFamily: fonts.num, fontSize: 32 }}>
+              {when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </T>
+          ) : null}
+          <T muted>
+            {[course?.name, course?.city, tee?.name ? `${tee.name} tees` : null, `Par ${played.par}`]
+              .filter(Boolean)
+              .join(' · ')}
+          </T>
+        </Card>
+        <Section title={`Players · ${match.match_players.length}`} />
+        {match.match_players.map((p) => (
+          <PlayerLink key={p.user_id} id={p.user_id}>
+            <Row style={{ minHeight: 40, borderBottomWidth: 1, borderColor: c.border }}>
+              <T style={{ fontFamily: fonts.bodyBold, flex: 1 }}>{nameOf(p.user_id)}</T>
+              <T variant="label" muted>
+                {teeOf(p)?.name ?? ''}
+              </T>
+            </Row>
+          </PlayerLink>
+        ))}
+        {match.join_code ? (
+          <T variant="label" muted>
+            Anyone else can join with code {match.join_code} (Matches → Join with code).
+          </T>
+        ) : null}
+        <ErrorText error={action.error ?? error} />
+        {canStart ? (
+          <Button
+            title="Start match"
+            kind="accent"
+            busy={action.busy}
+            onPress={() =>
+              action.run(async () => {
+                await startMatch(match.id);
+                await reload();
+              })
+            }
+          />
+        ) : null}
+        {canManage ? <Button title="Cancel match" kind="danger" onPress={confirmDelete} /> : null}
+      </Screen>
+    );
+  }
 
   const scorecard = (
     <Scorecard
