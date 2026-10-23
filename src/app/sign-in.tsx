@@ -38,8 +38,8 @@ export default function SignIn() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen>
         <View style={{ alignItems: 'center', gap: space.s, paddingTop: space.xxxl, paddingBottom: space.l }}>
-          <View style={{ backgroundColor: c.accent, borderRadius: 999, padding: space.l }}>
-            <Image source={require('@/assets/images/logo-mark.png')} style={{ width: 112, height: 112 }} contentFit="contain" />
+          <View style={{ backgroundColor: c.accent, borderRadius: 999, padding: space.xl }}>
+            <Image source={require('@/assets/images/logo-mark.png')} style={{ width: 104, height: 104 }} contentFit="contain" />
           </View>
           <T variant="display">The Rut</T>
           <T muted>League scores for the crew</T>
