@@ -18,6 +18,7 @@ export default function StatsScreen() {
   const c = usePalette();
   const [courseId, setCourseId] = useState<string | null>(null);
   const [width, setWidth] = useState(0);
+  const [hover, setHover] = useState<number | null>(null);
 
   const { data, error, loading, reload } = useLoad(async () => {
     const [profile, courses, history] = await Promise.all([getProfile(id), listCourses(), playerMatches(id, 1000)]);
@@ -66,6 +67,13 @@ export default function StatsScreen() {
   const x = (i: number) =>
     pad + (trend.length < 2 ? (width - 2 * pad) / 2 : (i / (trend.length - 1)) * (width - 2 * pad));
   const y = (v: number) => pad + ((hi - v) / Math.max(1, hi - lo)) * (H - 2 * pad);
+  const pick = (px: number) => {
+    if (!trend.length) return;
+    let best = 0;
+    for (let i = 1; i < trend.length; i++) if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
+    setHover(best);
+  };
+  const hp = hover != null ? trend[hover] : null;
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
@@ -111,6 +119,17 @@ export default function StatsScreen() {
                 {[lo, (lo + hi) / 2, hi].map((v) => (
                   <Line key={v} x1={0} x2={width} y1={y(v)} y2={y(v)} stroke={c.border} strokeWidth={1} />
                 ))}
+                {hp ? (
+                  <Line
+                    x1={x(hover!)}
+                    x2={x(hover!)}
+                    y1={0}
+                    y2={H}
+                    stroke={c.muted}
+                    strokeWidth={1}
+                    strokeDasharray="3 4"
+                  />
+                ) : null}
                 <Polyline
                   points={trend.map((t, i) => `${x(i)},${y(t.index)}`).join(' ')}
                   fill="none"
@@ -119,10 +138,56 @@ export default function StatsScreen() {
                   strokeLinejoin="round"
                 />
                 {trend.map((t, i) => (
-                  <Circle key={i} cx={x(i)} cy={y(t.index)} r={i === trend.length - 1 ? 5 : 3} fill={c.primary} />
+                  <Circle
+                    key={i}
+                    cx={x(i)}
+                    cy={y(t.index)}
+                    r={i === hover ? 7 : i === trend.length - 1 ? 5 : 3}
+                    fill={c.primary}
+                    stroke={i === hover ? c.surface : 'none'}
+                    strokeWidth={2}
+                  />
                 ))}
               </Svg>
             ) : null}
+            {hp ? (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: Math.max(0, y(hp.index) - 52),
+                  left: Math.min(Math.max(0, x(hover!) - 60), width - 120),
+                  width: 120,
+                  alignItems: 'center',
+                  paddingVertical: 4,
+                  borderRadius: radius.small,
+                  backgroundColor: c.text,
+                }}>
+                <T style={{ fontFamily: fonts.num, fontSize: 20, lineHeight: 22, color: c.bg }}>
+                  {hp.index.toFixed(1)}
+                </T>
+                <T variant="label" style={{ color: c.bg, fontSize: 11 }}>
+                  {new Date(`${hp.playedOn}T12:00:00`).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </T>
+              </View>
+            ) : null}
+            {/* Hover (browser) or touch (phone) picks the nearest point. */}
+            <View
+              style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={() => true}
+              onResponderGrant={(e) => pick(e.nativeEvent.locationX)}
+              onResponderMove={(e) => pick(e.nativeEvent.locationX)}
+              {...({
+                onPointerMove: (e: { nativeEvent: { offsetX?: number; locationX?: number } }) =>
+                  pick(e.nativeEvent.offsetX ?? e.nativeEvent.locationX ?? 0),
+                onPointerLeave: () => setHover(null),
+              } as object)}
+            />
           </View>
           <Row style={{ justifyContent: 'space-between' }}>
             <T variant="label" muted>
