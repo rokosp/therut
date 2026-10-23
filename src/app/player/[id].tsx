@@ -88,10 +88,11 @@ export default function PlayerScreen() {
         <>
           <StatsRow
             items={[
-              { v: full.stats.rounds, l: 'Rounds' },
-              { v: full.stats.avg18 ?? '–', l: 'Avg (18)' },
-              { v: full.stats.wins, l: 'Wins' },
-            ]}
+          { v: full.stats.rounds, l: 'Matches\nplayed' },
+          { v: full.stats.wins, l: 'Matches\nwon' },
+          { v: full.stats.leagues, l: 'Leagues\nplayed' },
+          { v: full.stats.leagueWins, l: 'Leagues\nwon' },
+        ]}
           />
           <Section title="Match history" />
           {full.history.matches.length === 0 ? <T muted>No matches yet.</T> : null}

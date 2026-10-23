@@ -79,9 +79,10 @@ export default function ProfileScreen() {
 
       <StatsRow
         items={[
-          { v: data?.stats.rounds ?? '–', l: 'Rounds' },
-          { v: data?.stats.avg18 ?? '–', l: 'Avg (18)' },
-          { v: data?.stats.wins ?? '–', l: 'Wins' },
+          { v: data?.stats.rounds ?? '–', l: 'Matches\nplayed' },
+          { v: data?.stats.wins ?? '–', l: 'Matches\nwon' },
+          { v: data?.stats.leagues ?? '–', l: 'Leagues\nplayed' },
+          { v: data?.stats.leagueWins ?? '–', l: 'Leagues\nwon' },
         ]}
       />
 

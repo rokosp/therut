@@ -38,7 +38,7 @@ export function StatsRow({ items }: { items: { v: string | number; l: string }[]
       {items.map((s) => (
         <View key={s.l} style={{ flex: 1, alignItems: 'center', borderTopWidth: 2, borderColor: c.accent, paddingTop: space.s }}>
           <T style={{ fontFamily: fonts.num, fontSize: 28 }}>{s.v}</T>
-          <T variant="label" muted>
+          <T variant="label" muted style={{ textAlign: 'center' }}>
             {s.l}
           </T>
         </View>

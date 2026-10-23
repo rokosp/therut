@@ -1,6 +1,7 @@
 import { playedHoles, type CourseInfo, type TeeInfo } from './course';
 import { calculateHandicap, type HandicapResult, type HandicapRound } from './handicap';
 import { scoreMatch, type PlayerResult } from './scoring';
+import { buildStandings } from './standings';
 import { supabase } from './supabase';
 import { withDefaults, type LeagueSettings, type MatchFormat, type MatchKind } from './types';
 
@@ -118,20 +119,21 @@ export async function getProfile(id: string): Promise<Profile & { created_at: st
   );
 }
 
-/** Rounds played, average 18-hole gross and outright wins across all my leagues. */
+/** Matches played and won, plus leagues played and won (finished seasons only), that I can see. */
 export async function playerStats(userId: string) {
+  const empty = { rounds: 0, avg18: null as number | null, wins: 0, leagues: 0, leagueWins: 0 };
   const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as { match_id: string }[];
-  if (mine.length === 0) return { rounds: 0, avg18: null as number | null, wins: 0 };
+  if (mine.length === 0) return empty;
   const matches = check(
     await supabase
       .from('matches')
-      .select(`${MATCH_SELECT}, leagues(settings)`)
+      .select(`${MATCH_SELECT}, leagues(settings, finished_at)`)
       .in(
         'id',
         mine.map((m) => m.match_id),
       ),
-  ) as (MatchRow & { leagues: { settings: Partial<LeagueSettings> } | null })[];
-  const courses = matches.some((m) => m.format === 'stableford') ? await listCourses() : [];
+  ) as (MatchRow & { leagues: { settings: Partial<LeagueSettings>; finished_at: string | null } | null })[];
+  const courses = await listCourses();
   let rounds = 0;
   let wins = 0;
   const grosses: number[] = [];
@@ -143,7 +145,20 @@ export async function playerStats(userId: string) {
     if (m.status === 'final' && r.position === 1 && !r.tied) wins += 1;
   }
   const avg18 = grosses.length ? Math.round((grosses.reduce((a, b) => a + b, 0) / grosses.length) * 10) / 10 : null;
-  return { rounds, avg18, wins };
+
+  // Leagues: any league they've played a match in; a win is top of the table when the season finished.
+  const leagueIds = [...new Set(matches.map((m) => m.league_id).filter((x): x is string => !!x))];
+  const finished = [...new Set(matches.filter((m) => m.league_id && m.leagues?.finished_at).map((m) => m.league_id!))];
+  let leagueWins = 0;
+  for (const lid of finished) {
+    const { matches: all, settings, members } = await getLeague(lid);
+    const table = buildStandings(
+      members.map((x) => x.user_id),
+      all.filter((x) => x.status === 'final').map((x) => resultsFor(x, settings, courses)),
+    );
+    if (table.find((t) => t.userId === userId)?.rank === 1) leagueWins += 1;
+  }
+  return { rounds, avg18, wins, leagues: leagueIds.length, leagueWins };
 }
 
 export async function updateProfile(id: string, patch: Partial<Omit<Profile, 'id'>>) {
