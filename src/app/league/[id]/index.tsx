@@ -36,7 +36,7 @@ export default function LeagueScreen() {
   const finals = matches.filter((m) => m.status === 'final' && (filter === 'season' || m.kind === filter));
   const table = buildStandings(
     members.map((m) => m.user_id),
-    finals.map((m) => resultsFor(m, settings)),
+    finals.map((m) => resultsFor(m, settings, courses)),
   );
 
   const invite = () =>
@@ -111,12 +111,13 @@ export default function LeagueScreen() {
       {matches.length === 0 ? <T muted>No matches yet. Add the first one after your next round.</T> : null}
       {matches.map((m) => {
         const course = courses.find((x) => x.id === m.course_id);
-        const res = resultsFor(m, settings);
+        const res = resultsFor(m, settings, courses);
         const winners = res.filter((r) => r.position === 1).map((r) => nameOf(r.userId));
         return (
           <Card key={m.id} onPress={() => router.push(`/match/${m.id}`)}>
             <Row style={{ flexWrap: 'wrap' }}>
               <Tag kind={m.kind} label={`${m.kind} · ${m.holes}`} />
+              <Tag kind="final" label={m.format === 'stableford' ? 'Stableford' : 'Stroke play'} />
               {m.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
               {m.status === 'open' ? <Tag kind="live" label="● Live" /> : null}
             </Row>

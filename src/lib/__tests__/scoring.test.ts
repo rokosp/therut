@@ -89,3 +89,22 @@ describe('buildStandings', () => {
     ]);
   });
 });
+
+describe('stableford', () => {
+  const pars = [4, 3, 5, 4, 4, 3, 4, 5, 4];
+  const sf = (userId: string, holeScores: number[]) => ({ userId, holeScores, courseHandicap: 0 });
+  const match = { kind: 'minor' as const, holes: 9 as const, format: 'stableford' as const, holePars: pars };
+
+  it('scores points per hole and ranks the most points first', () => {
+    // a: all pars = 18 pts. b: a birdie and a triple = 18 + 1 - 2 = 17 (triple scores 0, not -1).
+    const r = scoreMatch(match, [sf('a', pars), sf('b', [3, 3, 5, 7, 4, 3, 4, 5, 4])], gross);
+    expect(r.map((x) => [x.userId, x.stableford, x.position])).toEqual([['a', 18], ['b', 17]].map(([u, p], i) => [u, p, i + 1]));
+  });
+
+  it('breaks stableford ties by countback on points', () => {
+    const a = sf('a', [3, 3, 5, 4, 4, 3, 4, 5, 5]); // birdie early, bogey on 9
+    const b = sf('b', [5, 3, 5, 4, 4, 3, 4, 5, 3]); // bogey early, birdie on 9
+    const r = scoreMatch(match, [a, b], gross);
+    expect(r.map((x) => [x.userId, x.stableford, x.position])).toEqual([['b', 18, 1], ['a', 18, 2]]);
+  });
+});

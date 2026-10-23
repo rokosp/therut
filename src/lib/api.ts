@@ -2,7 +2,7 @@ import { playedHoles, type CourseInfo, type TeeInfo } from './course';
 import { calculateHandicap, type HandicapResult, type HandicapRound } from './handicap';
 import { scoreMatch, type PlayerResult } from './scoring';
 import { supabase } from './supabase';
-import { withDefaults, type LeagueSettings, type MatchKind } from './types';
+import { withDefaults, type LeagueSettings, type MatchFormat, type MatchKind } from './types';
 
 // Row shapes --------------------------------------------------------------
 
@@ -85,6 +85,8 @@ export interface MatchRow {
   tee_id: string | null;
   played_on: string;
   kind: MatchKind;
+  /** Missing until the match format migration has run; treat as stroke play. */
+  format?: MatchFormat | null;
   holes: 9 | 18;
   nine: 'front' | 'back' | null;
   status: 'open' | 'final';
@@ -124,11 +126,12 @@ export async function playerStats(userId: string) {
         mine.map((m) => m.match_id),
       ),
   ) as (MatchRow & { leagues: { settings: Partial<LeagueSettings> } | null })[];
+  const courses = matches.some((m) => m.format === 'stableford') ? await listCourses() : [];
   let rounds = 0;
   let wins = 0;
   const grosses: number[] = [];
   for (const m of matches) {
-    const r = resultsFor(m, withDefaults(m.leagues?.settings)).find((x) => x.userId === userId);
+    const r = resultsFor(m, withDefaults(m.leagues?.settings), courses).find((x) => x.userId === userId);
     if (!r || r.gross == null) continue;
     rounds += 1;
     if (m.holes === 18) grosses.push(r.gross);
@@ -220,8 +223,12 @@ export async function listLeagues(): Promise<League[]> {
   return check(await supabase.from('leagues').select('*').order('created_at', { ascending: false }));
 }
 
-export async function createLeague(name: string, season: string | null): Promise<League> {
-  return check(await supabase.from('leagues').insert({ name, season }).select().single());
+export async function createLeague(
+  name: string,
+  season: string | null,
+  settings: Partial<LeagueSettings> = {},
+): Promise<League> {
+  return check(await supabase.from('leagues').insert({ name, season, settings }).select().single());
 }
 
 export async function joinLeague(code: string): Promise<string> {
@@ -281,25 +288,28 @@ export async function createMatch(input: {
   teeId: string | null;
   playedOn: string;
   kind: MatchKind;
+  format: MatchFormat;
   holes: 9 | 18;
   nine: 'front' | 'back' | null;
   players: { userId: string; teeId: string | null; courseHandicap: number }[];
 }): Promise<string> {
-  const match = check(
-    await supabase
-      .from('matches')
-      .insert({
-        league_id: input.leagueId,
-        course_id: input.courseId,
-        tee_id: input.teeId,
-        played_on: input.playedOn,
-        kind: input.kind,
-        holes: input.holes,
-        nine: input.nine,
-      })
-      .select('id')
-      .single(),
-  ) as { id: string };
+  const row: Record<string, unknown> = {
+    league_id: input.leagueId,
+    course_id: input.courseId,
+    tee_id: input.teeId,
+    played_on: input.playedOn,
+    kind: input.kind,
+    format: input.format,
+    holes: input.holes,
+    nine: input.nine,
+  };
+  let res = await supabase.from('matches').insert(row).select('id').single();
+  if (res.error?.message.includes('format') && input.format === 'stroke') {
+    // Database hasn't had the match format update yet; stroke play is the default anyway.
+    delete row.format;
+    res = await supabase.from('matches').insert(row).select('id').single();
+  }
+  const match = check(res) as { id: string };
   check(
     await supabase
       .from('match_players')
@@ -398,9 +408,15 @@ export function holesFor(
   return { course, tee, played: playedHoles(match, course, tee) };
 }
 
-export function resultsFor(match: MatchRow, settings: LeagueSettings): PlayerResult[] {
+export function resultsFor(match: MatchRow, settings: LeagueSettings, courses: Course[] = []): PlayerResult[] {
+  const format = match.format ?? 'stroke';
   return scoreMatch(
-    { kind: match.kind, holes: match.holes },
+    {
+      kind: match.kind,
+      holes: match.holes,
+      format,
+      holePars: format === 'stableford' ? holesFor(match, courses).played.holePars : null,
+    },
     match.match_players.map((p) => ({
       userId: p.user_id,
       holeScores: p.hole_scores,

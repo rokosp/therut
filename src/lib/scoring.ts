@@ -1,4 +1,4 @@
-import type { LeagueSettings, MatchKind } from './types';
+import type { LeagueSettings, MatchFormat, MatchKind } from './types';
 
 export interface MatchPlayerInput {
   userId: string;
@@ -15,6 +15,28 @@ export interface MatchPlayerInput {
 export interface MatchInput {
   kind: MatchKind;
   holes: 9 | 18;
+  /** Defaults to stroke play. */
+  format?: MatchFormat;
+  /** Needed for Stableford. */
+  holePars?: number[] | null;
+}
+
+/** Stableford points for one hole: 2 for par, one more per stroke under, one less per stroke over, never below 0. */
+export function stablefordHole(strokes: number, par: number): number {
+  return Math.max(0, 2 + par - strokes);
+}
+
+/** Stableford points over the holes entered so far, or null without hole scores and pars. */
+export function stablefordPoints(holeScores: (number | null)[] | null | undefined, pars: number[] | null | undefined) {
+  if (!holeScores || !pars) return null;
+  let total = 0;
+  let any = false;
+  holeScores.forEach((s, i) => {
+    if (s == null || pars[i] == null) return;
+    any = true;
+    total += stablefordHole(s, pars[i]);
+  });
+  return any ? total : null;
 }
 
 export interface BonusInput {
@@ -24,6 +46,8 @@ export interface BonusInput {
 
 export interface PlayerResult {
   userId: string;
+  /** Stableford points (Stableford matches only). */
+  stableford: number | null;
   gross: number | null;
   net: number | null;
   /** The score the match is ranked on (gross or net). */
@@ -56,12 +80,22 @@ export function grossOf(p: MatchPlayerInput, holes: number): number | null {
  * Countback segments: last 9, 6, 3 and 1 holes for 18; last 6, 3 and 1 for 9.
  * For net scoring each segment takes off the matching share of the handicap.
  */
-export function countbackKey(p: MatchPlayerInput, holes: number, net: boolean): number[] | null {
+export function countbackKey(
+  p: MatchPlayerInput,
+  holes: number,
+  net: boolean,
+  stablefordPars?: number[] | null,
+): number[] | null {
   const hs = completeHoles(p, holes);
   if (!hs) return null;
   const segments = holes === 18 ? [9, 6, 3, 1] : [6, 3, 1];
   return segments.map((len) => {
-    const sum = hs.slice(holes - len).reduce((a, b) => a + b, 0);
+    const from = holes - len;
+    if (stablefordPars) {
+      // More points is better, so negate to keep "lower wins".
+      return -hs.slice(from).reduce((a, s, i) => a + stablefordHole(s, stablefordPars[from + i]), 0);
+    }
+    const sum = hs.slice(from).reduce((a, b) => a + b, 0);
     return net ? sum - (p.courseHandicap * len) / holes : sum;
   });
 }
@@ -79,7 +113,8 @@ function breakTie(
 ): { groups: MatchPlayerInput[][]; note: string } {
   const players = group.map((g) => g.p);
   if (settings.tiebreak === 'countback') {
-    const keys = new Map(players.map((p) => [p, countbackKey(p, match.holes, settings.scoring === 'net')]));
+    const sf = match.format === 'stableford' ? match.holePars : null;
+    const keys = new Map(players.map((p) => [p, countbackKey(p, match.holes, settings.scoring === 'net', sf)]));
     if ([...keys.values()].some((k) => k == null)) {
       return { groups: [players], note: 'Countback needs hole-by-hole scores, points split' };
     }
@@ -121,10 +156,14 @@ export function scoreMatch(
   const bonusBy = new Map<string, number>();
   for (const b of bonuses) bonusBy.set(b.userId, (bonusBy.get(b.userId) ?? 0) + b.points);
 
+  const stableford = match.format === 'stableford';
   const scored = players.map((p) => {
     const gross = grossOf(p, match.holes);
     const netScore = gross == null ? null : gross - p.courseHandicap;
-    return { p, gross, net: netScore, score: net ? netScore : gross };
+    // Stableford ranks on points over completed cards; negated so lower still ranks first.
+    const sf = stableford && completeHoles(p, match.holes) ? stablefordPoints(p.holeScores, match.holePars) : null;
+    const score = stableford ? (sf == null ? null : -sf) : net ? netScore : gross;
+    return { p, gross, net: netScore, score, sf };
   });
 
   const finished = scored.filter((s) => s.score != null);
@@ -143,6 +182,7 @@ export function scoreMatch(
         const bonus = bonusBy.get(p.userId) ?? 0;
         results.push({
           userId: p.userId,
+          stableford: s.sf,
           gross: s.gross,
           net: s.net,
           score: s.score,
@@ -163,7 +203,8 @@ export function scoreMatch(
     const bonus = bonusBy.get(s.p.userId) ?? 0;
     results.push({
       userId: s.p.userId,
-      gross: null,
+      stableford: null,
+      gross: s.gross,
       net: null,
       score: null,
       position: null,

@@ -16,8 +16,7 @@ type Draft = {
   season: string;
   majorPoints: string[];
   minorPoints: string[];
-  scoring: LeagueSettings['scoring'];
-  handicapSource: LeagueSettings['handicapSource'];
+  defaultFormat: LeagueSettings['defaultFormat'];
   tiebreak: LeagueSettings['tiebreak'];
   bonusTypes: { key: string; label: string; points: string }[];
 };
@@ -40,8 +39,7 @@ export default function LeagueSettingsScreen() {
       season: b.league.season ?? '',
       majorPoints: s.majorPoints.map(String),
       minorPoints: s.minorPoints.map(String),
-      scoring: s.scoring,
-      handicapSource: s.handicapSource,
+      defaultFormat: s.defaultFormat,
       tiebreak: s.tiebreak,
       bonusTypes: s.bonusTypes.map((t) => ({ ...t, points: String(t.points) })),
     });
@@ -72,8 +70,9 @@ export default function LeagueSettingsScreen() {
       const settings: LeagueSettings = {
         majorPoints,
         minorPoints,
-        scoring: draft.scoring,
-        handicapSource: draft.handicapSource,
+        defaultFormat: draft.defaultFormat,
+        scoring: 'gross',
+        handicapSource: data.settings.handicapSource,
         tiebreak: draft.tiebreak,
         bonusTypes,
       };
@@ -119,31 +118,17 @@ export default function LeagueSettingsScreen() {
       />
 
       <Card>
-        <T variant="title">Scoring</T>
-        <T variant="label" muted>
-          Rank each match on
-        </T>
+        <T variant="title">Default match format</T>
         <Segmented
           options={[
-            { value: 'net', label: 'Net (with handicap)' },
-            { value: 'gross', label: 'Gross' },
+            { value: 'stroke', label: 'Stroke play' },
+            { value: 'stableford', label: 'Stableford' },
           ]}
-          value={draft.scoring}
-          onChange={(v) => set({ scoring: v })}
+          value={draft.defaultFormat}
+          onChange={(v) => set({ defaultFormat: v })}
         />
         <T variant="label" muted>
-          Handicap used for net
-        </T>
-        <Segmented
-          options={[
-            { value: 'app', label: 'App handicap' },
-            { value: 'self', label: "Player's own" },
-          ]}
-          value={draft.handicapSource}
-          onChange={(v) => set({ handicapSource: v })}
-        />
-        <T variant="label" muted>
-          If one is missing, the other is used. The handicap is fixed when a match is created.
+          New matches start with this. You can still pick a different format for each match.
         </T>
       </Card>
 

@@ -14,7 +14,7 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { courseHandicap } from '@/lib/handicap';
-import type { MatchKind } from '@/lib/types';
+import type { MatchFormat, MatchKind } from '@/lib/types';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Segmented, T } from '@/ui/components';
 import { space } from '@/ui/theme';
@@ -28,6 +28,7 @@ export default function NewMatch() {
   const [courseId, setCourseId] = useState<string | null>(null);
   const [teeId, setTeeId] = useState<string | null>(null);
   const [kind, setKind] = useState<MatchKind>('major');
+  const [format, setFormat] = useState<MatchFormat | null>(null); // null = league default
   const [nine, setNine] = useState<'front' | 'back'>('front');
   const [players, setPlayers] = useState<Record<string, string | null>>({}); // userId -> own tee (null = match tee)
   const { busy, error, run } = useAction();
@@ -96,6 +97,7 @@ export default function NewMatch() {
         teeId,
         playedOn,
         kind,
+        format: format ?? settings.defaultFormat,
         holes,
         nine: matchShape.nine,
         players: ids.map((uid) => ({ userId: uid, teeId: players[uid] ?? teeId, courseHandicap: chFor(uid).ch })),
@@ -117,6 +119,22 @@ export default function NewMatch() {
         />
         <T variant="label" muted>
           Points for 1st: {(kind === 'major' ? settings.majorPoints : settings.minorPoints)[0] ?? 0}
+        </T>
+        <T variant="eyebrow" muted>
+          Format
+        </T>
+        <Segmented
+          options={[
+            { value: 'stroke', label: 'Stroke play' },
+            { value: 'stableford', label: 'Stableford' },
+          ]}
+          value={format ?? settings.defaultFormat}
+          onChange={setFormat}
+        />
+        <T variant="label" muted>
+          {(format ?? settings.defaultFormat) === 'stroke'
+            ? 'Fewest strokes wins.'
+            : 'Points per hole: par 2, birdie 3, eagle 4, bogey 1, worse 0. Most points wins. Needs hole-by-hole scores.'}
         </T>
         <Field label="Date played" value={playedOn} onChangeText={setPlayedOn} placeholder="YYYY-MM-DD" />
       </Card>
@@ -180,7 +198,7 @@ export default function NewMatch() {
           <Card key={uid}>
             <Row style={{ justifyContent: 'space-between' }}>
               <T variant="title">{displayName(m?.profiles)}</T>
-              <T variant="mono">{idx == null ? 'No hcp' : `HCP ${idx.toFixed(1)} → ${ch}`}</T>
+              <T variant="mono">{idx == null ? 'No HCP' : `HCP ${idx.toFixed(1)}`}</T>
             </Row>
             {course && course.course_tees.length > 1 ? (
               <View style={{ gap: space.xs }}>
@@ -203,10 +221,6 @@ export default function NewMatch() {
         );
       })}
 
-      <T variant="label" muted>
-        Strokes received are worked out from each player's {settings.handicapSource === 'app' ? 'app' : 'own'} handicap and
-        their tees, and stay fixed for this match.
-      </T>
       <ErrorText error={error} />
       <Button title="Start match" kind="accent" onPress={create} busy={busy} />
     </Screen>

@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { displayName, holesFor, type Course, type LiveMatch, type Profile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { buildCommentary } from '@/lib/commentary';
+import { stablefordPoints } from '@/lib/scoring';
 import { strokesPerHole } from '@/lib/handicap';
 import { withDefaults } from '@/lib/types';
 import { Card, Row, T, Tag } from '@/ui/components';
@@ -16,6 +17,7 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
   const settings = withDefaults(match.leagues?.settings);
   const { course, played } = holesFor(match, courses);
   const net = settings.scoring === 'net';
+  const stableford = match.format === 'stableford';
   const nameOf = (id: string) => displayName(profiles.find((p) => p.id === id));
 
   const rows = match.match_players
@@ -31,9 +33,12 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
         total += adj;
         toPar += adj - (played.holePars?.[i] ?? 0);
       });
-      return { id: p.user_id, thru, total, toPar };
+      const sf = stablefordPoints(p.hole_scores, played.holePars) ?? 0;
+      return { id: p.user_id, thru, total, toPar, sf };
     })
-    .sort((a, b) => (played.holePars ? a.toPar - b.toPar : a.total - b.total) || b.thru - a.thru);
+    .sort((a, b) =>
+      (stableford ? b.sf - a.sf : played.holePars ? a.toPar - b.toPar : a.total - b.total) || b.thru - a.thru,
+    );
 
   const feed = buildCommentary({
     players: match.match_players.map((p) => ({
@@ -71,7 +76,7 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
             {r.thru === 0 ? 'not started' : r.thru === played.holes ? 'F' : `thru ${r.thru}`}
           </T>
           <T style={{ width: 52, textAlign: 'right', fontFamily: fonts.num, fontSize: 24 }}>
-            {r.thru === 0 ? '–' : played.holePars ? fmt(r.toPar) : r.total}
+            {r.thru === 0 ? '–' : stableford ? `${r.sf}` : played.holePars ? fmt(r.toPar) : r.total}
           </T>
         </Row>
       ))}
@@ -86,7 +91,7 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
         </View>
       ) : null}
       <T variant="label" muted>
-        {net ? 'Net scores' : 'Gross scores'} · {match.status === 'open' ? 'tap to watch' : 'tap for the card'}
+        {stableford ? 'Stableford points' : 'Stroke play, to par'} · {match.status === 'open' ? 'tap to watch' : 'tap for the card'}
       </T>
     </Card>
   );

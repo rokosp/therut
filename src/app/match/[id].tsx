@@ -18,7 +18,7 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { buildCommentary, type CommentaryLine } from '@/lib/commentary';
-import { strokesPerHole } from '@/lib/handicap';
+import { stablefordHole, stablefordPoints } from '@/lib/scoring';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
@@ -66,7 +66,8 @@ export default function MatchScreen() {
   const editable = isAdmin || (match.status === 'open' && (isPlayer || match.created_by === userId));
   const { course, tee, played } = holesFor(match, courses);
   const nameOf = (uid: string) => displayName(members.find((m) => m.user_id === uid)?.profiles);
-  const results = resultsFor(match, settings);
+  const results = resultsFor(match, settings, courses);
+  const isStableford = match.format === 'stableford';
   const holeOffset = match.nine === 'back' ? 9 : 0;
 
   /** Update one player's row locally straight away, then save in order. */
@@ -107,6 +108,10 @@ export default function MatchScreen() {
 
   const tied = results.filter((r) => r.tied);
   const myResult = results.find((r) => r.userId === userId);
+  const myStableford = stablefordPoints(
+    match.match_players.find((p) => p.user_id === userId)?.hole_scores,
+    played.holePars,
+  );
   const confirmDelete = () =>
     confirmAction('Delete match?', 'Scores and bonuses for this match are removed for good.', 'Delete', () =>
       action.run(async () => {
@@ -121,6 +126,7 @@ export default function MatchScreen() {
       <View style={{ gap: space.s }}>
         <Row style={{ flexWrap: 'wrap' }}>
           <Tag kind={match.kind} label={`${match.kind} · ${match.holes}`} />
+          <Tag kind="final" label={isStableford ? 'Stableford' : 'Stroke play'} />
           {match.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
           {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
         </Row>
@@ -180,14 +186,15 @@ export default function MatchScreen() {
               {match.match_players.map((p) => {
                 const value = p.hole_scores?.[hole] ?? null;
                 const par = parOf(hole) ?? 4;
-                const shots = strokesPerHole(p.course_handicap, played.holes, played.strokeIndex)[hole];
                 return (
                   <Row key={p.user_id} style={{ justifyContent: 'space-between', minHeight: 56 }}>
                     <View style={{ flex: 1 }}>
                       <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(p.user_id)}</T>
-                      <T variant="label" muted>
-                        {shots > 0 ? `${'•'.repeat(shots)} ${shots} HCP stroke${shots === 1 ? '' : 's'} here` : ' '}
-                      </T>
+                      {isStableford && value != null && parOf(hole) != null ? (
+                        <T variant="label" muted>
+                          {stablefordHole(value, parOf(hole)!)} pts
+                        </T>
+                      ) : null}
                     </View>
                     <Stepper
                       value={value}
@@ -253,15 +260,15 @@ export default function MatchScreen() {
         <Row style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <View>
             <T variant="eyebrow" muted>
-              Your gross
+              {isStableford ? 'Your Stableford' : 'Your strokes'}
             </T>
             <T variant="score" style={{ fontSize: 56, lineHeight: 54 }}>
-              {myResult.gross ?? '–'}
+              {(isStableford ? myStableford : myResult.gross) ?? '–'}
             </T>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <T variant="eyebrow" muted>
-              Points
+              League points
             </T>
             <T variant="score" style={{ fontSize: 56, lineHeight: 54, color: c.accentText }}>
               +{myResult.total}
@@ -274,7 +281,7 @@ export default function MatchScreen() {
         title={match.status === 'final' ? 'Result' : 'Standings so far'}
         right={
           <T variant="eyebrow" muted>
-            {settings.scoring}
+            {isStableford ? 'Stableford' : 'Stroke play'}
           </T>
         }
       />
@@ -309,8 +316,9 @@ export default function MatchScreen() {
                   {nameOf(r.userId)}
                 </T>
                 <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
-                  {teeOf(p)?.name ?? ''} · CH {p.course_handicap}
-                  {r.gross != null ? ` · ${r.gross} gross · ${r.net} net` : ' · no score yet'}
+                  {teeOf(p)?.name ?? ''}
+                  {isStableford && r.stableford != null ? ` · ${r.stableford} pts` : ''}
+                  {r.gross != null ? ` · ${r.gross} strokes` : ' · card not finished'}
                   {r.bonusPoints ? ` · +${r.bonusPoints} bonus` : ''}
                 </T>
               </View>
