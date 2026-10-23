@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { MAX_SHOWCASE, type AchGroup, type Achievement } from '@/lib/achievements';
 import { Button, Section, T } from '@/ui/components';
@@ -51,15 +52,19 @@ export function Badge({
           borderStyle: a.earned ? 'solid' : 'dashed',
           opacity: a.earned ? 1 : 0.8,
         }}>
-        <T
-          style={{
-            fontFamily: fonts.displayBlack,
-            fontSize: glyphSize,
-            lineHeight: glyphSize * 1.1,
-            color: a.earned ? col.fg : c.muted,
-          }}>
-          {a.glyph}
-        </T>
+        {a.id === 'lone-wolf' ? (
+          <PuddingGuy size={size * 0.72} color={a.earned ? col.fg : c.muted} />
+        ) : (
+          <T
+            style={{
+              fontFamily: fonts.displayBlack,
+              fontSize: glyphSize,
+              lineHeight: glyphSize * 1.1,
+              color: a.earned ? col.fg : c.muted,
+            }}>
+            {a.glyph}
+          </T>
+        )}
       </View>
       {showName ? (
         <T variant="label" numberOfLines={2} style={{ textAlign: 'center', fontSize: 12, lineHeight: 15 }}>
@@ -138,5 +143,25 @@ export function BadgesBlock({
       )}
       <Button title={mine ? 'All badges' : 'See their badges'} kind="secondary" onPress={open} />
     </View>
+  );
+}
+
+/** A lone guy at a table, eating pudding by himself. */
+function PuddingGuy({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Circle cx={60} cy={27} r={12} fill={color} />
+      <Path d="M49 25 L44 32 L50 33 Z" fill={color} />
+      <Path d="M50 52 Q52 42 64 41 Q84 42 88 66 L90 74 L50 74 Z" fill={color} />
+      {/* Elbow on the table, spoon up to the mouth. */}
+      <Path d="M56 50 L44 70" stroke={color} strokeWidth={9} strokeLinecap="round" />
+      <Path d="M44 70 L40 46" stroke={color} strokeWidth={7} strokeLinecap="round" />
+      <Path d="M40 45 L49 37" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+      <Rect x={6} y={74} width={90} height={7} rx={2} fill={color} />
+      <Rect x={76} y={81} width={6} height={15} fill={color} />
+      {/* The pudding cup. */}
+      <Path d="M17 63 L31 63 L29 74 L19 74 Z" fill={color} />
+      <Path d="M16.5 63 Q18 56 24 58 Q30 56 31.5 63 Z" fill={color} />
+    </Svg>
   );
 }
