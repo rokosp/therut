@@ -29,13 +29,17 @@ export default function NotificationsScreen() {
     <Screen refreshing={loading} onRefresh={reload}>
       <ErrorText error={error} />
       {data && data.length === 0 ? (
-        <T muted>Nothing yet. Match invites and friends teeing off show up here.</T>
+        <T muted>Nothing yet. Match invites, friend requests and friends teeing off show up here.</T>
       ) : null}
       <View>
         {data?.map((n) => (
           <Pressable
             key={n.id}
-            onPress={() => n.match_id && router.push(`/match/${n.match_id}`)}
+            onPress={() => {
+              if (n.match_id) router.push(`/match/${n.match_id}`);
+              else if (n.kind === 'friend_request') router.push('/profile');
+              else if (n.from_user) router.push(`/player/${n.from_user}`);
+            }}
             style={{ paddingVertical: space.m, borderBottomWidth: 1, borderColor: c.border }}>
             <Row style={{ alignItems: 'flex-start' }}>
               <View

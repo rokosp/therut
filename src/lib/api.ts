@@ -132,8 +132,17 @@ export async function getProfile(id: string): Promise<Profile & { created_at: st
 
 /** Matches played and won, plus leagues played and won (finished seasons only), that I can see. */
 export async function playerStats(userId: string) {
-  const empty = { rounds: 0, avg18: null as number | null, wins: 0, leagues: 0, leagueWins: 0, career: careerHighlights([]) };
-  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as { match_id: string }[];
+  const empty = {
+    rounds: 0,
+    avg18: null as number | null,
+    wins: 0,
+    leagues: 0,
+    leagueWins: 0,
+    career: careerHighlights([]),
+  };
+  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as {
+    match_id: string;
+  }[];
   if (mine.length === 0) return empty;
   const matches = check(
     await supabase
@@ -237,7 +246,9 @@ export async function sendFriendRequest(me: string, other: string) {
 }
 
 export async function acceptFriend(me: string, requester: string) {
-  check(await supabase.from('friendships').update({ status: 'accepted' }).eq('requester', requester).eq('addressee', me));
+  check(
+    await supabase.from('friendships').update({ status: 'accepted' }).eq('requester', requester).eq('addressee', me),
+  );
 }
 
 export async function removeFriend(me: string, other: string) {
@@ -279,7 +290,10 @@ export async function claimGuest(code: string): Promise<string> {
 
 export async function listCourses(): Promise<Course[]> {
   const rows = check(await supabase.from('courses').select('*, course_tees(*)').order('name'));
-  return rows.map((c: Course) => ({ ...c, course_tees: [...c.course_tees].sort((a, b) => a.sort_order - b.sort_order) }));
+  return rows.map((c: Course) => ({
+    ...c,
+    course_tees: [...c.course_tees].sort((a, b) => a.sort_order - b.sort_order),
+  }));
 }
 
 /** Look a course up on GolfCourseAPI (through Supabase, which holds the key) and save what it finds. */
@@ -342,10 +356,7 @@ export interface LeagueBundle {
 export async function getLeague(id: string): Promise<LeagueBundle> {
   const [league, members, matches] = await Promise.all([
     supabase.from('leagues').select('*').eq('id', id).single(),
-    supabase
-      .from('league_members')
-      .select('user_id, role, profiles(*)')
-      .eq('league_id', id),
+    supabase.from('league_members').select('user_id, role, profiles(*)').eq('league_id', id),
     supabase.from('matches').select(MATCH_SELECT).eq('league_id', id).order('played_on', { ascending: false }),
   ]);
   const l = check(league) as League;
@@ -398,16 +409,14 @@ export async function createMatch(input: {
   }
   const match = check(res) as { id: string };
   check(
-    await supabase
-      .from('match_players')
-      .insert(
-        input.players.map((p) => ({
-          match_id: match.id,
-          user_id: p.userId,
-          tee_id: p.teeId,
-          course_handicap: p.courseHandicap,
-        })),
-      ),
+    await supabase.from('match_players').insert(
+      input.players.map((p) => ({
+        match_id: match.id,
+        user_id: p.userId,
+        tee_id: p.teeId,
+        course_handicap: p.courseHandicap,
+      })),
+    ),
   );
   return match.id;
 }
@@ -445,7 +454,9 @@ export async function startMatch(id: string) {
 
 /** Scheduled matches I'm playing in, soonest first. */
 export async function listUpcoming(userId: string): Promise<{ matches: LiveMatch[]; profiles: Profile[] }> {
-  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as { match_id: string }[];
+  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as {
+    match_id: string;
+  }[];
   if (mine.length === 0) return { matches: [], profiles: [] };
   const matches = check(
     await supabase
@@ -467,10 +478,11 @@ export async function listUpcoming(userId: string): Promise<{ matches: LiveMatch
 
 export interface AppNotification {
   id: string;
-  kind: 'invite' | 'live';
+  kind: 'invite' | 'live' | 'friend_request' | 'friend_accepted';
   title: string;
   body: string | null;
   match_id: string | null;
+  from_user?: string | null;
   created_at: string;
   read_at: string | null;
 }
@@ -494,7 +506,14 @@ export async function deleteMatch(id: string) {
   check(await supabase.from('matches').delete().eq('id', id));
 }
 
-export async function addBonus(b: { matchId: string; userId: string; typeKey: string | null; label: string; points: number; hole?: number | null }) {
+export async function addBonus(b: {
+  matchId: string;
+  userId: string;
+  typeKey: string | null;
+  label: string;
+  points: number;
+  hole?: number | null;
+}) {
   check(
     await supabase.from('bonus_awards').insert({
       match_id: b.matchId,
@@ -530,8 +549,13 @@ export async function listLiveMatches(): Promise<{ matches: LiveMatch[]; profile
 }
 
 /** A player's matches, newest first (only ones I'm allowed to see). */
-export async function playerMatches(userId: string, limit = 20): Promise<{ matches: LiveMatch[]; profiles: Profile[] }> {
-  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as { match_id: string }[];
+export async function playerMatches(
+  userId: string,
+  limit = 20,
+): Promise<{ matches: LiveMatch[]; profiles: Profile[] }> {
+  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as {
+    match_id: string;
+  }[];
   if (mine.length === 0) return { matches: [], profiles: [] };
   const matches = check(
     await supabase
@@ -591,13 +615,16 @@ export async function handicapsFor(userIds: string[], courses: Course[]): Promis
       .from('match_players')
       .select('user_id, tee_id, hole_scores, gross, matches(id, played_on, holes, nine, course_id, tee_id)')
       .in('user_id', userIds),
-  ) as unknown as (MatchPlayerRow & { matches: Pick<MatchRow, 'id' | 'played_on' | 'holes' | 'nine' | 'course_id' | 'tee_id'> })[];
+  ) as unknown as (MatchPlayerRow & {
+    matches: Pick<MatchRow, 'id' | 'played_on' | 'holes' | 'nine' | 'course_id' | 'tee_id'>;
+  })[];
 
   const byUser = new Map<string, HandicapRound[]>();
   for (const r of rows) {
     const m = r.matches;
     const { played } = holesFor(m, courses, r.tee_id);
-    const complete = r.hole_scores && r.hole_scores.length === played.holes && r.hole_scores.every((s) => s != null && s > 0);
+    const complete =
+      r.hole_scores && r.hole_scores.length === played.holes && r.hole_scores.every((s) => s != null && s > 0);
     const gross = complete ? (r.hole_scores as number[]).reduce((a, b) => a + b, 0) : r.gross;
     if (gross == null) continue;
     const list = byUser.get(r.user_id) ?? [];
@@ -620,7 +647,11 @@ export async function handicapsFor(userIds: string[], courses: Course[]): Promis
 }
 
 /** The index a league uses for net scoring: app or self-entered, falling back to the other. */
-export function playingIndex(settings: LeagueSettings, app: number | null | undefined, self: number | null | undefined) {
+export function playingIndex(
+  settings: LeagueSettings,
+  app: number | null | undefined,
+  self: number | null | undefined,
+) {
   const a = app ?? null;
   const s = self != null ? Number(self) : null;
   return settings.handicapSource === 'self' ? (s ?? a) : (a ?? s);
