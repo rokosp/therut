@@ -58,7 +58,7 @@ export default function MatchesScreen() {
       <Section title="Past matches" />
       {data && past.length === 0 ? <T muted>Finished matches you played in will show up here.</T> : null}
       {past.map((m) => (
-        <PastMatchCard key={m.id} match={m} courses={data!.courses} userId={userId!} />
+        <PastMatchCard key={m.id} match={m} courses={data!.courses} profiles={data!.profiles} userId={userId!} />
       ))}
     </Screen>
   );

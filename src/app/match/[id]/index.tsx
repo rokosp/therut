@@ -64,7 +64,9 @@ export default function MatchScreen() {
   const isPlayer = match.match_players.some((p) => p.user_id === userId);
   // Anyone playing (or whoever set the match up) can keep score for everyone. Others watch.
   // A finished season locks everything.
-  const editable = !locked && (isAdmin || (match.status === 'open' && (isPlayer || match.created_by === userId)));
+  // Finished matches are read-only; the match admin can reopen them for edits.
+  const editable = !locked && match.status === 'open' && (isAdmin || isPlayer || match.created_by === userId);
+  const showScores = match.status === 'final';
   const { course, tee, played } = holesFor(match, courses);
   const nameOf = (uid: string) => displayName(members.find((m) => m.user_id === uid)?.profiles);
   const results = resultsFor(match, settings, courses);
@@ -121,6 +123,23 @@ export default function MatchScreen() {
       }),
     );
 
+  const scorecard = (
+    <Scorecard
+      holes={played.holes}
+      offset={holeOffset}
+      pars={played.holePars}
+      players={match.match_players.map((p) => ({
+        name: nameOf(p.user_id),
+        scores: p.hole_scores ?? [],
+        bonusHoles: match.bonus_awards
+          .filter((b) => b.user_id === p.user_id && b.hole != null)
+          .map((b) => b.hole! - 1 - holeOffset),
+      }))}
+      current={mode === 'holes' && editable ? hole : null}
+      onPickHole={setHole}
+    />
+  );
+
   return (
     <Screen refreshing={loading} onRefresh={reload}>
       <Stack.Screen options={{ title: 'Match' }} />
@@ -148,7 +167,12 @@ export default function MatchScreen() {
       </View>
       <ErrorText error={saveError ?? error} />
       {casual && match.status === 'open' && match.join_code ? (
-        <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Card
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
           <View style={{ flex: 1 }}>
             <T variant="eyebrow" muted>
               Match code
@@ -239,7 +263,9 @@ export default function MatchScreen() {
                 defaultValue={p.gross != null ? String(p.gross) : ''}
                 onEndEditing={(e) => {
                   const n = parseInt(e.nativeEvent.text, 10);
-                  updatePlayer(p.user_id, { gross: Number.isNaN(n) ? null : n });
+                  updatePlayer(p.user_id, {
+                    gross: Number.isNaN(n) ? null : n,
+                  });
                 }}
               />
             ))
@@ -247,126 +273,244 @@ export default function MatchScreen() {
         </Card>
       ) : null}
 
-      <Scorecard
-        holes={played.holes}
-        offset={holeOffset}
-        pars={played.holePars}
-        players={match.match_players.map((p) => ({ name: nameOf(p.user_id), scores: p.hole_scores ?? [] }))}
-        current={mode === 'holes' && editable ? hole : null}
-        onPickHole={setHole}
-      />
-
       {match.status === 'final' ? (
-        <Rundown
-          summary={rundownText(results, nameOf, isStableford, played.par)}
-          happenings={matchHappenings({
-            players: match.match_players.map((p) => ({ userId: p.user_id, name: nameOf(p.user_id), holeScores: p.hole_scores })),
-            holePars: played.holePars,
-            holeOffset,
-          })}
-        />
-      ) : null}
-
-      {/* Live updates are for people watching; players in the match don't need the distraction. */}
-      {!isPlayer && match.status === 'open' ? (
-        <Commentary
-          lines={buildCommentary({
-            players: match.match_players.map((p) => ({
-              userId: p.user_id,
-              name: nameOf(p.user_id),
-              holeScores: p.hole_scores,
-              courseHandicap: p.course_handicap,
-            })),
-            holes: played.holes,
-            holePars: played.holePars,
-            strokeIndex: played.strokeIndex,
-            scoring: settings.scoring,
-            holeOffset,
-          })}
-          offset={holeOffset}
-        />
-      ) : null}
-
-      {myResult ? (
-        <Row style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <View>
-            <T variant="eyebrow" muted>
-              {isStableford ? 'Your Stableford' : 'Your strokes'}
-            </T>
-            <T variant="score" style={{ fontSize: 56, lineHeight: 54 }}>
-              {(isStableford ? myStableford : myResult.gross) ?? '–'}
-            </T>
-          </View>
-          {!casual ? (
-            <View style={{ alignItems: 'flex-end' }}>
+        <>
+          <Section
+            title="Result"
+            right={
               <T variant="eyebrow" muted>
-                League points
+                {isStableford ? 'Stableford' : 'Stroke play'}
               </T>
-              <T variant="score" style={{ fontSize: 56, lineHeight: 54, color: c.accentText }}>
-                +{myResult.total}
-              </T>
-            </View>
+            }
+          />
+          <View style={{ marginTop: -space.s }}>
+            {results.map((r) => {
+              const p = match.match_players.find((x) => x.user_id === r.userId)!;
+              const lead = r.position === 1 && r.score != null;
+              return (
+                <Row
+                  key={r.userId}
+                  style={{
+                    gap: space.m,
+                    paddingVertical: space.m,
+                    paddingHorizontal: space.m,
+                    borderRadius: lead ? radius.input : 0,
+                    backgroundColor: lead ? c.leader : undefined,
+                    borderBottomWidth: lead ? 0 : 1,
+                    borderColor: c.border,
+                  }}>
+                  <T
+                    style={{
+                      width: 28,
+                      textAlign: 'center',
+                      fontFamily: fonts.num,
+                      fontSize: 22,
+                      color: lead ? c.onLeader : c.text,
+                    }}>
+                    {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
+                  </T>
+                  <View style={{ flex: 1 }}>
+                    <T
+                      style={{
+                        fontFamily: fonts.bodyBold,
+                        fontSize: 16,
+                        color: lead ? c.onLeader : c.text,
+                      }}>
+                      {nameOf(r.userId)}
+                    </T>
+                    <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
+                      {teeOf(p)?.name ?? ''}
+                      {showScores
+                        ? [
+                            isStableford && r.gross != null ? ` · ${r.gross} strokes` : '',
+                            !casual ? ` · +${r.total} league pts` : '',
+                            r.bonusPoints ? ` (${r.bonusPoints} bonus)` : '',
+                            r.gross == null ? ' · card not finished' : '',
+                          ].join('')
+                        : [
+                            isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : '',
+                            r.gross != null
+                              ? casual && !isStableford
+                                ? ''
+                                : ` · ${r.gross} strokes`
+                              : ' · card not finished',
+                            r.bonusPoints ? ` · +${r.bonusPoints} bonus` : '',
+                          ].join('')}
+                    </T>
+                  </View>
+                  <T
+                    style={{
+                      fontFamily: fonts.num,
+                      fontSize: 28,
+                      color: lead ? c.onLeader : c.text,
+                    }}>
+                    {casual || showScores ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
+                  </T>
+                </Row>
+              );
+            })}
+          </View>
+          {results.some((r) => r.tiebreakNote) ? (
+            <T variant="label" muted>
+              Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
+            </T>
           ) : null}
-        </Row>
-      ) : null}
+          {scorecard}
 
-      <Section
-        title={match.status === 'final' ? 'Result' : 'Standings so far'}
-        right={
-          <T variant="eyebrow" muted>
-            {isStableford ? 'Stableford' : 'Stroke play'}
-          </T>
-        }
-      />
-      <View style={{ marginTop: -space.s }}>
-        {results.map((r) => {
-          const p = match.match_players.find((x) => x.user_id === r.userId)!;
-          const lead = r.position === 1 && r.score != null;
-          return (
+          {match.status === 'final' ? (
+            <Rundown
+              summary={rundownText(results, nameOf, isStableford, played.par)}
+              happenings={matchHappenings({
+                players: match.match_players.map((p) => ({
+                  userId: p.user_id,
+                  name: nameOf(p.user_id),
+                  holeScores: p.hole_scores,
+                })),
+                holePars: played.holePars,
+                holeOffset,
+              })}
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          {scorecard}
+
+          {/* Live updates are for people watching; players in the match don't need the distraction. */}
+          {!isPlayer && match.status === 'open' ? (
+            <Commentary
+              lines={buildCommentary({
+                players: match.match_players.map((p) => ({
+                  userId: p.user_id,
+                  name: nameOf(p.user_id),
+                  holeScores: p.hole_scores,
+                  courseHandicap: p.course_handicap,
+                })),
+                holes: played.holes,
+                holePars: played.holePars,
+                strokeIndex: played.strokeIndex,
+                scoring: settings.scoring,
+                holeOffset,
+              })}
+              offset={holeOffset}
+            />
+          ) : null}
+
+          {myResult ? (
             <Row
-              key={r.userId}
               style={{
-                gap: space.m,
-                paddingVertical: space.m,
-                paddingHorizontal: space.m,
-                borderRadius: lead ? radius.input : 0,
-                backgroundColor: lead ? c.leader : undefined,
-                borderBottomWidth: lead ? 0 : 1,
-                borderColor: c.border,
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
               }}>
-              <T
-                style={{
-                  width: 28,
-                  textAlign: 'center',
-                  fontFamily: fonts.num,
-                  fontSize: 22,
-                  color: lead ? c.onLeader : c.text,
-                }}>
-                {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
-              </T>
-              <View style={{ flex: 1 }}>
-                <T style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: lead ? c.onLeader : c.text }}>
-                  {nameOf(r.userId)}
+              <View>
+                <T variant="eyebrow" muted>
+                  {isStableford ? 'Your Stableford' : 'Your strokes'}
                 </T>
-                <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
-                  {teeOf(p)?.name ?? ''}
-                  {isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : ''}
-                  {r.gross != null ? (casual && !isStableford ? '' : ` · ${r.gross} strokes`) : ' · card not finished'}
-                  {r.bonusPoints ? ` · +${r.bonusPoints} bonus` : ''}
+                <T variant="score" style={{ fontSize: 56, lineHeight: 54 }}>
+                  {(isStableford ? myStableford : myResult.gross) ?? '–'}
                 </T>
               </View>
-              <T style={{ fontFamily: fonts.num, fontSize: 28, color: lead ? c.onLeader : c.text }}>
-                {casual ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
-              </T>
+              {!casual ? (
+                <View style={{ alignItems: 'flex-end' }}>
+                  <T variant="eyebrow" muted>
+                    League points
+                  </T>
+                  <T
+                    variant="score"
+                    style={{
+                      fontSize: 56,
+                      lineHeight: 54,
+                      color: c.accentText,
+                    }}>
+                    +{myResult.total}
+                  </T>
+                </View>
+              ) : null}
             </Row>
-          );
-        })}
-      </View>
-      {results.some((r) => r.tiebreakNote) ? (
-        <T variant="label" muted>
-          Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
-        </T>
-      ) : null}
+          ) : null}
+
+          <Section
+            title="Standings so far"
+            right={
+              <T variant="eyebrow" muted>
+                {isStableford ? 'Stableford' : 'Stroke play'}
+              </T>
+            }
+          />
+          <View style={{ marginTop: -space.s }}>
+            {results.map((r) => {
+              const p = match.match_players.find((x) => x.user_id === r.userId)!;
+              const lead = r.position === 1 && r.score != null;
+              return (
+                <Row
+                  key={r.userId}
+                  style={{
+                    gap: space.m,
+                    paddingVertical: space.m,
+                    paddingHorizontal: space.m,
+                    borderRadius: lead ? radius.input : 0,
+                    backgroundColor: lead ? c.leader : undefined,
+                    borderBottomWidth: lead ? 0 : 1,
+                    borderColor: c.border,
+                  }}>
+                  <T
+                    style={{
+                      width: 28,
+                      textAlign: 'center',
+                      fontFamily: fonts.num,
+                      fontSize: 22,
+                      color: lead ? c.onLeader : c.text,
+                    }}>
+                    {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
+                  </T>
+                  <View style={{ flex: 1 }}>
+                    <T
+                      style={{
+                        fontFamily: fonts.bodyBold,
+                        fontSize: 16,
+                        color: lead ? c.onLeader : c.text,
+                      }}>
+                      {nameOf(r.userId)}
+                    </T>
+                    <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
+                      {teeOf(p)?.name ?? ''}
+                      {showScores
+                        ? [
+                            isStableford && r.gross != null ? ` · ${r.gross} strokes` : '',
+                            !casual ? ` · +${r.total} league pts` : '',
+                            r.bonusPoints ? ` (${r.bonusPoints} bonus)` : '',
+                            r.gross == null ? ' · card not finished' : '',
+                          ].join('')
+                        : [
+                            isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : '',
+                            r.gross != null
+                              ? casual && !isStableford
+                                ? ''
+                                : ` · ${r.gross} strokes`
+                              : ' · card not finished',
+                            r.bonusPoints ? ` · +${r.bonusPoints} bonus` : '',
+                          ].join('')}
+                    </T>
+                  </View>
+                  <T
+                    style={{
+                      fontFamily: fonts.num,
+                      fontSize: 28,
+                      color: lead ? c.onLeader : c.text,
+                    }}>
+                    {casual || showScores ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
+                  </T>
+                </Row>
+              );
+            })}
+          </View>
+          {results.some((r) => r.tiebreakNote) ? (
+            <T variant="label" muted>
+              Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
+            </T>
+          ) : null}
+        </>
+      )}
 
       {settings.tiebreak === 'playoff' &&
       editable &&
@@ -386,7 +530,9 @@ export default function MatchScreen() {
                   defaultValue={p.playoff_rank != null ? String(p.playoff_rank) : ''}
                   onEndEditing={(e) => {
                     const n = parseInt(e.nativeEvent.text, 10);
-                    updatePlayer(p.user_id, { playoff_rank: Number.isNaN(n) ? null : n });
+                    updatePlayer(p.user_id, {
+                      playoff_rank: Number.isNaN(n) ? null : n,
+                    });
                   }}
                   style={{
                     width: 64,
@@ -405,16 +551,19 @@ export default function MatchScreen() {
       ) : null}
 
       {casual ? null : (
-      <Bonuses
-        editable={editable}
-        canRemove={(createdBy) => isAdmin || createdBy === userId}
-        bonuses={match.bonus_awards}
-        players={match.match_players.map((p) => ({ id: p.user_id, name: nameOf(p.user_id) }))}
-        types={settings.bonusTypes}
-        maxHole={played.holes + holeOffset}
-        onAdd={(b) => action.run(async () => (await addBonus({ matchId: match.id, ...b }), await reload()))}
-        onRemove={(bid) => action.run(async () => (await removeBonus(bid), await reload()))}
-      />
+        <Bonuses
+          editable={editable}
+          canRemove={(createdBy) => isAdmin || createdBy === userId}
+          bonuses={match.bonus_awards}
+          players={match.match_players.map((p) => ({
+            id: p.user_id,
+            name: nameOf(p.user_id),
+          }))}
+          types={settings.bonusTypes}
+          maxHole={played.holes + holeOffset}
+          onAdd={(b) => action.run(async () => (await addBonus({ matchId: match.id, ...b }), await reload()))}
+          onRemove={(bid) => action.run(async () => (await removeBonus(bid), await reload()))}
+        />
       )}
 
       <ErrorText error={action.error} />
@@ -522,7 +671,15 @@ function ScoreMark({
           borderColor: line,
           borderRadius: round ? inner / 2 : 2,
         }}>
-        <Text style={{ fontFamily: fonts.num, fontSize, color, lineHeight: fontSize * 1.1 }}>{score ?? '–'}</Text>
+        <Text
+          style={{
+            fontFamily: fonts.num,
+            fontSize,
+            color,
+            lineHeight: fontSize * 1.1,
+          }}>
+          {score ?? '–'}
+        </Text>
       </View>
     </View>
   );
@@ -539,7 +696,7 @@ function Scorecard({
   holes: number;
   offset: number;
   pars: number[] | null;
-  players: { name: string; scores: (number | null)[] }[];
+  players: { name: string; scores: (number | null)[]; bonusHoles?: number[] }[];
   current: number | null;
   onPickHole: (i: number) => void;
 }) {
@@ -547,7 +704,11 @@ function Scorecard({
   const blocks = holes === 18 ? [0, 9] : [0];
   const sum = (xs: (number | null | undefined)[]) =>
     xs.length && xs.every((x) => x != null) ? (xs as number[]).reduce((a, b) => a + b, 0) : '';
-  const cell = { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const };
+  const cell = {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  };
   const nameW = 56;
   return (
     <View style={{ gap: space.s }}>
@@ -556,7 +717,12 @@ function Scorecard({
         return (
           <View
             key={start}
-            style={{ borderWidth: 1, borderColor: c.border, borderRadius: radius.input, overflow: 'hidden' }}>
+            style={{
+              borderWidth: 1,
+              borderColor: c.border,
+              borderRadius: radius.input,
+              overflow: 'hidden',
+            }}>
             <Row style={{ gap: 0, backgroundColor: c.surface, height: 26 }}>
               <View style={{ width: nameW, paddingLeft: space.s }}>
                 <T variant="eyebrow" muted>
@@ -597,14 +763,26 @@ function Scorecard({
               </Row>
             ) : null}
             {players.map((p) => (
-              <Row key={p.name} style={{ gap: 0, height: 38, borderTopWidth: 1, borderColor: c.border }}>
+              <Row
+                key={p.name}
+                style={{
+                  gap: 0,
+                  height: 38,
+                  borderTopWidth: 1,
+                  borderColor: c.border,
+                }}>
                 <View style={{ width: nameW, paddingLeft: space.s }}>
                   <T variant="label" numberOfLines={1} style={{ fontFamily: fonts.bodyBold }}>
                     {p.name}
                   </T>
                 </View>
                 {cols.map((i) => (
-                  <View key={i} style={cell}>
+                  <View
+                    key={i}
+                    style={[
+                      cell,
+                      p.bonusHoles?.includes(i) && { backgroundColor: c.accent, borderRadius: 4, margin: 2 },
+                    ]}>
                     {p.scores[i] != null ? <ScoreMark score={p.scores[i]!} par={pars?.[i] ?? null} /> : <T muted>·</T>}
                   </View>
                 ))}
@@ -616,6 +794,14 @@ function Scorecard({
           </View>
         );
       })}
+      {players.some((p) => p.bonusHoles?.length) ? (
+        <Row style={{ gap: space.s }}>
+          <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: c.accent }} />
+          <T variant="label" muted>
+            Bonus earned on that hole
+          </T>
+        </Row>
+      ) : null}
     </View>
   );
 }
@@ -632,7 +818,14 @@ function Bonuses({
 }: {
   editable: boolean;
   canRemove: (createdBy: string) => boolean;
-  bonuses: { id: string; user_id: string; label: string; points: number; hole: number | null; created_by: string }[];
+  bonuses: {
+    id: string;
+    user_id: string;
+    label: string;
+    points: number;
+    hole: number | null;
+    created_by: string;
+  }[];
   players: { id: string; name: string }[];
   types: { key: string; label: string; points: number }[];
   maxHole: number;
@@ -655,11 +848,23 @@ function Bonuses({
     if (h != null && (Number.isNaN(h) || h < 1 || h > maxHole)) return setErr(`Hole should be 1 to ${maxHole}.`);
     if (typeKey) {
       const t = types.find((x) => x.key === typeKey)!;
-      onAdd({ userId: who, typeKey: t.key, label: t.label, points: t.points, hole: h });
+      onAdd({
+        userId: who,
+        typeKey: t.key,
+        label: t.label,
+        points: t.points,
+        hole: h,
+      });
     } else {
       const pts = Number(customPoints.replace(',', '.'));
       if (!customLabel.trim() || Number.isNaN(pts)) return setErr('Give the bonus a name and points.');
-      onAdd({ userId: who, typeKey: null, label: customLabel.trim(), points: pts, hole: h });
+      onAdd({
+        userId: who,
+        typeKey: null,
+        label: customLabel.trim(),
+        points: pts,
+        hole: h,
+      });
     }
     setHole('');
     setCustomLabel('');
@@ -750,7 +955,12 @@ function Commentary({ lines, offset }: { lines: CommentaryLine[]; offset: number
   const c = usePalette();
   const [all, setAll] = useState(false);
   if (lines.length === 0) return null;
-  const color = { great: c.accentText, ouch: c.danger, lead: c.primary, hole: c.text };
+  const color = {
+    great: c.accentText,
+    ouch: c.danger,
+    lead: c.primary,
+    hole: c.text,
+  };
   const shown = all ? lines : lines.slice(0, 6);
   return (
     <Card>
@@ -760,7 +970,12 @@ function Commentary({ lines, offset }: { lines: CommentaryLine[]; offset: number
           <T variant="label" muted style={{ width: 32, paddingTop: 3 }}>
             #{l.hole + 1 + offset}
           </T>
-          <T style={{ flex: 1, color: color[l.kind], fontFamily: l.kind === 'hole' ? fonts.body : fonts.bodyBold }}>
+          <T
+            style={{
+              flex: 1,
+              color: color[l.kind],
+              fontFamily: l.kind === 'hole' ? fonts.body : fonts.bodyBold,
+            }}>
             {l.text}
           </T>
         </Row>
@@ -776,7 +991,13 @@ const toParText = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : String(n));
 
 /** One or two sentences on how the match went. */
 function rundownText(
-  results: { userId: string; position: number | null; gross: number | null; stableford: number | null; tiebreakNote: string | null }[],
+  results: {
+    userId: string;
+    position: number | null;
+    gross: number | null;
+    stableford: number | null;
+    tiebreakNote: string | null;
+  }[],
   nameOf: (id: string) => string,
   stableford: boolean,
   par: number,
@@ -798,7 +1019,10 @@ function rundownText(
       ? `edging ${nameOf(second.userId)}${win.tiebreakNote ? ` on ${win.tiebreakNote}` : ''}`
       : `beating ${nameOf(second.userId)} by ${margin} ${stableford ? (margin === 1 ? 'point' : 'points') : margin === 1 ? 'stroke' : 'strokes'}`;
   const last = done.filter((r) => r.position !== 1).sort((a, b) => b.position! - a.position!)[0];
-  const tail = done.length > 2 && last.userId !== second.userId ? ` ${nameOf(last.userId)} brought up the rear with ${score(last)}.` : '';
+  const tail =
+    done.length > 2 && last.userId !== second.userId
+      ? ` ${nameOf(last.userId)} brought up the rear with ${score(last)}.`
+      : '';
   return `${nameOf(win.userId)} won with ${score(win)}, ${how}.${tail}`;
 }
 
@@ -817,8 +1041,17 @@ function Rundown({ summary, happenings }: { summary: string | null; happenings: 
           </T>
           {happenings.map((h, i) => (
             <Row key={i} style={{ alignItems: 'flex-start' }}>
-              <T style={{ width: 16, color: color[h.kind] }}>{h.kind === 'great' ? '★' : h.kind === 'ouch' ? '✕' : '·'}</T>
-              <T style={{ flex: 1, color: h.kind === 'info' ? c.text : color[h.kind], fontFamily: fonts.bodyBold }}>{h.text}</T>
+              <T style={{ width: 16, color: color[h.kind] }}>
+                {h.kind === 'great' ? '★' : h.kind === 'ouch' ? '✕' : '·'}
+              </T>
+              <T
+                style={{
+                  flex: 1,
+                  color: h.kind === 'info' ? c.text : color[h.kind],
+                  fontFamily: fonts.bodyBold,
+                }}>
+                {h.text}
+              </T>
             </Row>
           ))}
         </>

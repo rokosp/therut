@@ -1,13 +1,15 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
-import { displayName, holesFor, type Course, type LiveMatch, type Profile } from '@/lib/api';
+import { useState } from 'react';
+
+import { displayName, holesFor, resultsFor, type Course, type LiveMatch, type Profile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { buildCommentary } from '@/lib/commentary';
 import { stablefordPoints } from '@/lib/scoring';
 import { strokesPerHole } from '@/lib/handicap';
 import { withDefaults } from '@/lib/types';
-import { Card, Row, T, Tag } from '@/ui/components';
+import { Button, Card, Row, T, Tag } from '@/ui/components';
 import { fonts, space, usePalette } from '@/ui/theme';
 
 /** Match summary with a mini leaderboard and the latest commentary line. */
@@ -101,10 +103,21 @@ const leagueLabel = (m: LiveMatch) => (m.league_id ? (m.leagues?.name ?? "Friend
 
 /**
  * A finished match, kept short: tags, course, and one player's score against par.
- * Tapping opens the summary (top 3) rather than the full card.
+ * Tapping opens it in place to show the top 3 and a way into the full match.
  */
-export function PastMatchCard({ match, courses, userId }: { match: LiveMatch; courses: Course[]; userId: string }) {
+export function PastMatchCard({
+  match,
+  courses,
+  profiles,
+  userId,
+}: {
+  match: LiveMatch;
+  courses: Course[];
+  profiles: Profile[];
+  userId: string;
+}) {
   const c = usePalette();
+  const [open, setOpen] = useState(false);
   const { course, played } = holesFor(match, courses);
   const mine = match.match_players.find((p) => p.user_id === userId);
   const scores = mine?.hole_scores ?? [];
@@ -112,7 +125,7 @@ export function PastMatchCard({ match, courses, userId }: { match: LiveMatch; co
   const gross = complete ? (scores as number[]).reduce((a, b) => a + b, 0) : (mine?.gross ?? null);
   const pts = match.format === 'stableford' ? stablefordPoints(mine?.hole_scores, played.holePars) : null;
   return (
-    <Card onPress={() => router.push(`/match/${match.id}/summary`)}>
+    <Card onPress={() => setOpen(!open)}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={{ flex: 1, gap: space.s }}>
           <Row style={{ flexWrap: 'wrap' }}>
@@ -132,6 +145,36 @@ export function PastMatchCard({ match, courses, userId }: { match: LiveMatch; co
           </T>
         </View>
       </Row>
+      {open ? <TopThree match={match} courses={courses} profiles={profiles} /> : null}
     </Card>
+  );
+}
+
+function TopThree({ match, courses, profiles }: { match: LiveMatch; courses: Course[]; profiles: Profile[] }) {
+  const c = usePalette();
+  const { played } = holesFor(match, courses);
+  const stableford = match.format === 'stableford';
+  const top = resultsFor(match, withDefaults(match.leagues?.settings), courses)
+    .filter((r) => r.position != null)
+    .slice(0, 3);
+  const toPar = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : String(n));
+  return (
+    <View style={{ borderTopWidth: 1, borderColor: c.border, paddingTop: space.s, gap: space.xs }}>
+      {top.map((r) => (
+        <Row key={r.userId} style={{ minHeight: 36 }}>
+          <T style={{ width: 28, fontFamily: fonts.num, fontSize: 20, color: r.position === 1 ? c.accentText : c.text }}>
+            {`${r.tied ? 'T' : ''}${r.position}`}
+          </T>
+          <T style={{ flex: 1, fontFamily: fonts.bodyBold }}>{displayName(profiles.find((p) => p.id === r.userId))}</T>
+          <T variant="label" muted>
+            {stableford ? 'pts' : r.gross != null ? toPar(r.gross - played.par) : ''}
+          </T>
+          <T style={{ width: 48, textAlign: 'right', fontFamily: fonts.num, fontSize: 24 }}>
+            {(stableford ? r.stableford : r.gross) ?? '–'}
+          </T>
+        </Row>
+      ))}
+      <Button title="View full match" compact onPress={() => router.push(`/match/${match.id}`)} />
+    </View>
   );
 }

@@ -98,7 +98,7 @@ export default function PlayerScreen() {
           {full.history.matches.length === 0 ? <T muted>No matches yet.</T> : null}
           {full.history.matches.map((m) =>
             m.status === 'final' ? (
-              <PastMatchCard key={m.id} match={m} courses={full.courses} userId={id} />
+              <PastMatchCard key={m.id} match={m} courses={full.courses} profiles={full.history.profiles} userId={id} />
             ) : (
               <MatchCard key={m.id} match={m} profiles={full.history.profiles} courses={full.courses} />
             ),
