@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { View } from 'react-native';
 
 import { listCourses, listLiveMatches, playerMatches } from '@/lib/api';
@@ -7,13 +6,11 @@ import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
 import { Button, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { MatchCard, PastMatchCard } from '@/ui/MatchCard';
-import { SwingIntro } from '@/ui/SwingIntro';
 import { radius, space, usePalette } from '@/ui/theme';
 
 export default function MatchesScreen() {
   const { userId } = useAuth();
   const c = usePalette();
-  const [intro, setIntro] = useState(false);
   const { data, error, loading, reload } = useLoad(
     async () => {
       const [live, mine, courses] = await Promise.all([listLiveMatches(), playerMatches(userId!, 30), listCourses()]);
@@ -27,13 +24,6 @@ export default function MatchesScreen() {
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
-      <SwingIntro
-        visible={intro}
-        onDone={() => {
-          setIntro(false);
-          router.push('/match/new');
-        }}
-      />
       <ErrorText error={error} />
       <Section
         title="Live now"
@@ -65,7 +55,7 @@ export default function MatchesScreen() {
       ))}
 
       <Row>
-        <Button title="Start a match" kind="accent" onPress={() => setIntro(true)} style={{ flex: 1 }} />
+        <Button title="Start a match" kind="accent" onPress={() => router.push('/match/new')} style={{ flex: 1 }} />
         <Button
           title="Join with code"
           kind="secondary"
