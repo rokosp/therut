@@ -16,7 +16,8 @@ import { useEffect } from 'react';
 import { Platform, useColorScheme, useWindowDimensions, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { fonts, usePalette } from '@/ui/theme';
+import { HeaderTitle } from '@/ui/components';
+import { usePalette } from '@/ui/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -46,7 +47,7 @@ function RootStack() {
         screenOptions={{
           headerStyle: { backgroundColor: c.bg },
           headerTintColor: c.text,
-          headerTitleStyle: { fontFamily: fonts.display, fontSize: 22 },
+          headerTitle: ({ children }) => <HeaderTitle title={children} />,
           headerShadowVisible: false,
           contentStyle: { backgroundColor: c.bg },
         }}>
@@ -55,12 +56,12 @@ function RootStack() {
         </Stack.Protected>
         <Stack.Protected guard={!!session}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="league/new" options={{ title: 'NEW LEAGUE', presentation: 'modal' }} />
-          <Stack.Screen name="league/join" options={{ title: 'JOIN LEAGUE', presentation: 'modal' }} />
-          <Stack.Screen name="league/[id]/index" options={{ title: 'LEAGUE' }} />
-          <Stack.Screen name="league/[id]/settings" options={{ title: 'LEAGUE SETTINGS' }} />
-          <Stack.Screen name="league/[id]/new-match" options={{ title: 'NEW MATCH' }} />
-          <Stack.Screen name="match/[id]" options={{ title: 'MATCH' }} />
+          <Stack.Screen name="league/new" options={{ title: 'New league', presentation: 'modal' }} />
+          <Stack.Screen name="league/join" options={{ title: 'Join league', presentation: 'modal' }} />
+          <Stack.Screen name="league/[id]/index" options={{ title: 'League' }} />
+          <Stack.Screen name="league/[id]/settings" options={{ title: 'Settings' }} />
+          <Stack.Screen name="league/[id]/new-match" options={{ title: 'New match' }} />
+          <Stack.Screen name="match/[id]" options={{ title: 'Match' }} />
         </Stack.Protected>
       </Stack>
     </>

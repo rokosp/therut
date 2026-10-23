@@ -6,7 +6,7 @@ import { buildCommentary } from '@/lib/commentary';
 import { strokesPerHole } from '@/lib/handicap';
 import { withDefaults } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
-import { Card, ErrorText, Row, Screen, T } from '@/ui/components';
+import { Card, ErrorText, Row, Screen, T, Tag } from '@/ui/components';
 import { fonts, space, usePalette } from '@/ui/theme';
 
 export default function LiveScreen() {
@@ -87,24 +87,23 @@ function LiveCard({
   return (
     <Card onPress={() => router.push(`/match/${match.id}`)}>
       <Row style={{ justifyContent: 'space-between' }}>
-        <T variant="label" style={{ color: c.danger }}>
-          ● LIVE
-        </T>
-        <T variant="label" muted>
-          {match.leagues.name} · {match.kind === 'major' ? 'MAJOR' : 'MINOR'}
+        <Row>
+          <Tag kind="live" label="● Live" />
+          <Tag kind={match.kind} label={`${match.kind} · ${match.holes}`} />
+        </Row>
+        <T variant="eyebrow" muted>
+          {match.leagues.name}
         </T>
       </Row>
       <T variant="h2">{course?.name ?? 'Match'}</T>
       {rows.map((r, i) => (
         <Row key={r.id} style={{ minHeight: 36 }}>
-          <T variant="mono" style={{ width: 24 }}>
-            {i + 1}
-          </T>
+          <T style={{ width: 24, fontFamily: fonts.num, fontSize: 20 }}>{i + 1}</T>
           <T style={{ flex: 1, fontFamily: fonts.bodyBold }}>{nameOf(r.id)}</T>
           <T variant="label" muted style={{ width: 64, textAlign: 'right' }}>
             {r.thru === 0 ? 'not started' : r.thru === played.holes ? 'done' : `thru ${r.thru}`}
           </T>
-          <T variant="mono" style={{ width: 52, textAlign: 'right', fontSize: 18 }}>
+          <T style={{ width: 52, textAlign: 'right', fontFamily: fonts.num, fontSize: 24 }}>
             {r.thru === 0 ? '–' : played.holePars ? fmt(r.toPar) : r.total}
           </T>
         </Row>

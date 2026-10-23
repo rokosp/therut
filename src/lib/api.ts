@@ -88,8 +88,37 @@ const MATCH_SELECT = '*, match_players(*), bonus_awards(*)';
 
 // Profiles ----------------------------------------------------------------
 
-export async function getProfile(id: string): Promise<Profile> {
-  return check(await supabase.from('profiles').select('id, display_name, nickname, self_handicap').eq('id', id).single());
+export async function getProfile(id: string): Promise<Profile & { created_at: string }> {
+  return check(
+    await supabase.from('profiles').select('id, display_name, nickname, self_handicap, created_at').eq('id', id).single(),
+  );
+}
+
+/** Rounds played, average 18-hole gross and outright wins across all my leagues. */
+export async function playerStats(userId: string) {
+  const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as { match_id: string }[];
+  if (mine.length === 0) return { rounds: 0, avg18: null as number | null, wins: 0 };
+  const matches = check(
+    await supabase
+      .from('matches')
+      .select(`${MATCH_SELECT}, leagues(settings)`)
+      .in(
+        'id',
+        mine.map((m) => m.match_id),
+      ),
+  ) as (MatchRow & { leagues: { settings: Partial<LeagueSettings> } })[];
+  let rounds = 0;
+  let wins = 0;
+  const grosses: number[] = [];
+  for (const m of matches) {
+    const r = resultsFor(m, withDefaults(m.leagues.settings)).find((x) => x.userId === userId);
+    if (!r || r.gross == null) continue;
+    rounds += 1;
+    if (m.holes === 18) grosses.push(r.gross);
+    if (m.status === 'final' && r.position === 1 && !r.tied) wins += 1;
+  }
+  const avg18 = grosses.length ? Math.round((grosses.reduce((a, b) => a + b, 0) / grosses.length) * 10) / 10 : null;
+  return { rounds, avg18, wins };
 }
 
 export async function updateProfile(id: string, patch: Partial<Omit<Profile, 'id'>>) {

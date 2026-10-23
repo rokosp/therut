@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -7,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useColorScheme,
   View,
   type TextInputProps,
   type TextProps,
@@ -29,7 +31,7 @@ export function Screen({
 }) {
   const c = usePalette();
   return (
-    <SafeAreaView edges={['bottom', 'left', 'right']} style={{ flex: 1, backgroundColor: c.bg }}>
+    <SafeAreaView edges={['left', 'right']} style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
         contentContainerStyle={{ padding: padded ? space.l : 0, gap: space.l, paddingBottom: space.xxxl }}
         keyboardShouldPersistTaps="handled"
@@ -51,19 +53,25 @@ export function Loading() {
   );
 }
 
-type Variant = 'display' | 'h1' | 'h2' | 'title' | 'body' | 'label' | 'mono' | 'score';
+type Variant = 'display' | 'h1' | 'h2' | 'title' | 'body' | 'label' | 'eyebrow' | 'mono' | 'score';
 
+/**
+ * Text in the brand type system.
+ * display/h1/h2: Big Shoulders, all caps. mono: numbers in Big Shoulders (scores are the biggest thing on screen).
+ * eyebrow: IBM Plex Mono small caps for tags and column heads. label: small body text.
+ */
 export function T({ variant = 'body', muted, style, ...rest }: TextProps & { variant?: Variant; muted?: boolean }) {
   const c = usePalette();
   const v: Record<Variant, object> = {
-    display: { fontFamily: fonts.displayBlack, fontSize: type.display, lineHeight: type.display, textTransform: 'uppercase' },
-    h1: { fontFamily: fonts.display, fontSize: type.h1, lineHeight: type.h1 * 1.05, textTransform: 'uppercase' },
-    h2: { fontFamily: fonts.display, fontSize: type.h2, lineHeight: type.h2 * 1.1, textTransform: 'uppercase' },
-    title: { fontFamily: fonts.bodyBold, fontSize: type.title },
-    body: { fontFamily: fonts.body, fontSize: type.body, lineHeight: type.body * 1.4 },
-    label: { fontFamily: fonts.bodyMedium, fontSize: type.label, letterSpacing: 0.4 },
-    mono: { fontFamily: fonts.mono, fontSize: type.body },
-    score: { fontFamily: fonts.mono, fontSize: type.score },
+    display: { fontFamily: fonts.displayBlack, fontSize: type.display, lineHeight: type.display * 0.95, textTransform: 'uppercase' },
+    h1: { fontFamily: fonts.displayBlack, fontSize: 28, lineHeight: 28, textTransform: 'uppercase' },
+    h2: { fontFamily: fonts.display, fontSize: 22, lineHeight: 24, textTransform: 'uppercase' },
+    title: { fontFamily: fonts.bodyBold, fontSize: 15 },
+    body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21 },
+    label: { fontFamily: fonts.body, fontSize: 12, lineHeight: 16 },
+    eyebrow: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' },
+    mono: { fontFamily: fonts.num, fontSize: 20 },
+    score: { fontFamily: fonts.displayBlack, fontSize: 48, lineHeight: 46 },
   };
   return <Text style={[{ color: muted ? c.muted : c.text }, v[variant], style]} {...rest} />;
 }
@@ -75,6 +83,7 @@ export function Button({
   disabled,
   busy,
   style,
+  compact,
 }: {
   title: string;
   onPress: () => void;
@@ -82,11 +91,12 @@ export function Button({
   disabled?: boolean;
   busy?: boolean;
   style?: ViewStyle;
+  compact?: boolean;
 }) {
   const c = usePalette();
   const bg = { primary: c.primary, accent: c.accent, secondary: 'transparent', danger: 'transparent' }[kind];
-  const fg = { primary: c.onPrimary, accent: c.onAccent, secondary: c.text, danger: c.danger }[kind];
-  const border = kind === 'secondary' ? c.border : kind === 'danger' ? c.danger : bg;
+  const fg = { primary: c.onPrimary, accent: c.onAccent, secondary: c.head, danger: c.danger }[kind];
+  const border = kind === 'secondary' ? c.head : kind === 'danger' ? c.danger : bg;
   return (
     <Pressable
       accessibilityRole="button"
@@ -94,21 +104,23 @@ export function Button({
       disabled={disabled || busy}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: bg, borderColor: border, opacity: disabled ? 0.45 : pressed ? 0.8 : 1 },
+        compact && { minHeight: 40, paddingHorizontal: space.m, borderRadius: radius.input },
+        { backgroundColor: bg, borderColor: border, opacity: disabled ? 0.4 : pressed ? 0.8 : 1 },
         style,
       ]}>
       {busy ? (
         <ActivityIndicator color={fg} />
       ) : (
-        <Text style={{ color: fg, fontFamily: fonts.bodyBold, fontSize: type.body }}>{title}</Text>
+        <Text style={{ color: fg, fontFamily: fonts.bodyBold, fontSize: compact ? 14 : 15 }}>{title}</Text>
       )}
     </Pressable>
   );
 }
 
+/** A soft panel on the page background, as in the brand book's bonus rows. */
 export function Card({ children, style, onPress }: { children: ReactNode; style?: ViewStyle; onPress?: () => void }) {
   const c = usePalette();
-  const s = [styles.card, { backgroundColor: c.card, borderColor: c.border }, style];
+  const s = [styles.card, { backgroundColor: c.surface }, style];
   if (!onPress) return <View style={s}>{children}</View>;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [...s, { opacity: pressed ? 0.85 : 1 }]}>
@@ -117,16 +129,28 @@ export function Card({ children, style, onPress }: { children: ReactNode; style?
   );
 }
 
+/** Section heading: Plex Mono small caps with an optional action on the right. */
+export function Section({ title, right }: { title: string; right?: ReactNode }) {
+  return (
+    <Row style={{ justifyContent: 'space-between', marginTop: space.s }}>
+      <T variant="eyebrow" muted>
+        {title}
+      </T>
+      {right}
+    </Row>
+  );
+}
+
 export function Field({ label, hint, ...props }: TextInputProps & { label: string; hint?: string }) {
   const c = usePalette();
   return (
     <View style={{ gap: space.xs }}>
-      <T variant="label" muted>
+      <T variant="eyebrow" muted>
         {label}
       </T>
       <TextInput
         placeholderTextColor={c.muted}
-        style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
+        style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.bg }]}
         {...props}
       />
       {hint ? (
@@ -138,7 +162,7 @@ export function Field({ label, hint, ...props }: TextInputProps & { label: strin
   );
 }
 
-/** A row of options where exactly one is selected. */
+/** Pill switch, one option selected (Season / Majors / Minors in the brand book). */
 export function Segmented<V extends string | number>({
   options,
   value,
@@ -150,7 +174,7 @@ export function Segmented<V extends string | number>({
 }) {
   const c = usePalette();
   return (
-    <View style={[styles.segmented, { borderColor: c.border }]}>
+    <View style={[styles.segmented, { backgroundColor: c.surface }]}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -160,9 +184,7 @@ export function Segmented<V extends string | number>({
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.value)}
             style={[styles.segment, { backgroundColor: on ? c.primary : 'transparent' }]}>
-            <Text style={{ color: on ? c.onPrimary : c.text, fontFamily: fonts.bodyMedium, fontSize: type.label }}>
-              {o.label}
-            </Text>
+            <Text style={{ color: on ? c.onPrimary : c.text, fontFamily: fonts.bodyBold, fontSize: 13 }}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -176,8 +198,68 @@ export function Chip({ label, on, onPress }: { label: string; on?: boolean; onPr
     <Pressable
       onPress={onPress}
       style={[styles.chip, { borderColor: on ? c.primary : c.border, backgroundColor: on ? c.primary : 'transparent' }]}>
-      <Text style={{ color: on ? c.onPrimary : c.text, fontFamily: fonts.bodyMedium, fontSize: type.label }}>{label}</Text>
+      <Text style={{ color: on ? c.onPrimary : c.text, fontFamily: fonts.bodyMedium, fontSize: 13 }}>{label}</Text>
     </Pressable>
+  );
+}
+
+/** Match tags: Major filled pine, Minor outlined, Bonus blaze, Live red. */
+export function Tag({ kind, label }: { kind: 'major' | 'minor' | 'bonus' | 'live' | 'final'; label: string }) {
+  const c = usePalette();
+  const dark = useColorScheme() === 'dark';
+  const pine = dark ? c.text : c.head;
+  const look = {
+    major: { bg: dark ? c.text : c.head, fg: c.bg, border: 'transparent' },
+    minor: { bg: 'transparent', fg: pine, border: pine },
+    bonus: { bg: c.accent, fg: c.onAccent, border: 'transparent' },
+    live: { bg: 'transparent', fg: c.danger, border: c.danger },
+    final: { bg: 'transparent', fg: c.muted, border: c.muted },
+  }[kind];
+  return (
+    <View style={[styles.tag, { backgroundColor: look.bg, borderColor: look.border }]}>
+      <Text style={{ color: look.fg, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+export function Avatar({ name, size = 28 }: { name: string; size?: number }) {
+  const c = usePalette();
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: c.accent,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <Text style={{ color: c.onAccent, fontFamily: fonts.displayBlack, fontSize: size * 0.42 }}>
+        {(name.trim()[0] ?? '?').toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
+/** The deer mark next to a screen title, like the brand book's app bar. */
+export function HeaderTitle({ title }: { title: string }) {
+  const c = usePalette();
+  const dark = useColorScheme() === 'dark';
+  return (
+    <Row style={{ gap: space.s }}>
+      <Image
+        source={dark ? require('@/assets/images/logo-mark-blaze.png') : require('@/assets/images/logo-mark.png')}
+        style={{ width: 20, height: 28 }}
+        contentFit="contain"
+      />
+      <Text
+        numberOfLines={1}
+        style={{ color: c.text, fontFamily: fonts.displayBlack, fontSize: 24, textTransform: 'uppercase', maxWidth: 240 }}>
+        {title}
+      </Text>
+    </Row>
   );
 }
 
@@ -195,28 +277,36 @@ const styles = StyleSheet.create({
   button: {
     minHeight: touch,
     paddingHorizontal: space.xl,
-    borderRadius: radius.small,
+    borderRadius: radius.card,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  card: { borderRadius: radius.card, borderWidth: 1, padding: space.l, gap: space.s },
+  card: { borderRadius: radius.card, padding: space.l, gap: space.s },
   input: {
     minHeight: touch,
-    borderWidth: 1,
-    borderRadius: radius.small,
+    borderWidth: 1.5,
+    borderRadius: radius.input,
     paddingHorizontal: space.m,
     fontFamily: fonts.body,
-    fontSize: type.body,
+    fontSize: 16,
   },
-  segmented: { flexDirection: 'row', borderWidth: 1, borderRadius: radius.small, overflow: 'hidden' },
-  segment: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.s },
+  segmented: { flexDirection: 'row', borderRadius: radius.chip, padding: 3 },
+  segment: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: radius.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space.s,
+  },
   chip: {
     minHeight: 36,
     paddingHorizontal: space.m,
     borderRadius: radius.chip,
-    borderWidth: 1,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  tag: { borderRadius: radius.chip, borderWidth: 1.5, paddingHorizontal: 9, paddingVertical: 2, alignSelf: 'flex-start' },
 });

@@ -13,38 +13,59 @@ export const brand = {
 } as const;
 
 export type Palette = Record<
-  'bg' | 'card' | 'text' | 'muted' | 'border' | 'primary' | 'onPrimary' | 'accent' | 'onAccent' | 'accentText' | 'danger' | 'leader',
+  | 'bg'
+  | 'surface'
+  | 'card'
+  | 'text'
+  | 'head'
+  | 'muted'
+  | 'border'
+  | 'primary'
+  | 'onPrimary'
+  | 'accent'
+  | 'onAccent'
+  | 'accentText'
+  | 'danger'
+  | 'leader'
+  | 'onLeader',
   string
 >;
 
+/** Light is Bone and Pine for daytime on the course. Dark is Rough with Blaze accents. */
 export const palettes: { light: Palette; dark: Palette } = {
   light: {
     bg: brand.bone,
-    card: '#FFFFFF',
+    surface: '#E2E1D5',
+    card: '#E2E1D5',
     text: brand.rough,
+    head: brand.pine,
     muted: brand.slate,
-    border: '#D9D6C8',
+    border: '#DCDBCE',
     primary: brand.pine,
     onPrimary: brand.bone,
     accent: brand.blaze,
     onAccent: brand.rough,
     accentText: brand.ember,
     danger: brand.birdie,
-    leader: '#F7DDB9',
+    leader: brand.blaze,
+    onLeader: brand.rough,
   },
   dark: {
     bg: brand.rough,
-    card: '#123A2C',
+    surface: '#103527',
+    card: '#103527',
     text: brand.bone,
-    muted: '#A9B5AD',
-    border: '#24503F',
+    head: brand.bone,
+    muted: '#9FB0A6',
+    border: '#22493A',
     primary: brand.blaze,
     onPrimary: brand.rough,
     accent: brand.blaze,
     onAccent: brand.rough,
     accentText: brand.blaze,
     danger: brand.birdieDark,
-    leader: '#3A3A1E',
+    leader: brand.blaze,
+    onLeader: brand.rough,
   },
 };
 
@@ -58,10 +79,11 @@ export const fonts = {
   body: 'InstrumentSans_400Regular',
   bodyMedium: 'InstrumentSans_500Medium',
   bodyBold: 'InstrumentSans_600SemiBold',
+  num: 'BigShouldersDisplay_800ExtraBold',
   mono: 'IBMPlexMono_500Medium',
 };
 
 export const type = { display: 48, h1: 32, h2: 24, title: 20, body: 16, label: 13, score: 40 };
 export const space = { xs: 4, s: 8, m: 12, l: 16, xl: 24, xxl: 32, xxxl: 48 };
-export const radius = { small: 6, card: 14, chip: 999 };
+export const radius = { small: 6, input: 10, card: 14, chip: 999 };
 export const touch = 48;

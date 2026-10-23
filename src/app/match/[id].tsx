@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import {
   addBonus,
@@ -20,7 +20,7 @@ import { useAuth } from '@/lib/auth';
 import { buildCommentary, type CommentaryLine } from '@/lib/commentary';
 import { strokesPerHole } from '@/lib/handicap';
 import { useAction, useLoad } from '@/lib/useLoad';
-import { Button, Card, Chip, ErrorText, Field, Row, Screen, Segmented, T } from '@/ui/components';
+import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 export default function MatchScreen() {
@@ -101,6 +101,7 @@ export default function MatchScreen() {
   const teeOf = (p: MatchPlayerRow) => holesFor(match, courses, p.tee_id).tee;
 
   const tied = results.filter((r) => r.tied);
+  const myResult = results.find((r) => r.userId === userId);
   const confirmDelete = () =>
     Alert.alert('Delete match?', 'Scores and bonuses for this match are removed for good.', [
       { text: 'Cancel', style: 'cancel' },
@@ -117,21 +118,31 @@ export default function MatchScreen() {
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
-      <Stack.Screen options={{ title: (course?.name ?? 'Match').toUpperCase() }} />
-      <Row style={{ justifyContent: 'space-between' }}>
+      <Stack.Screen options={{ title: 'Match' }} />
+      <View style={{ gap: space.s }}>
+        <Row style={{ flexWrap: 'wrap' }}>
+          <Tag kind={match.kind} label={`${match.kind} · ${match.holes}`} />
+          {match.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
+          {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
+        </Row>
+        <T variant="display" style={{ fontSize: 40, lineHeight: 40 }}>
+          {course?.name ?? 'Match'}
+        </T>
         <T muted>
-          {match.played_on} · {tee?.name ?? 'No tee'} · {match.holes} holes
-          {match.nine ? ` (${match.nine})` : ''}
+          {[
+            match.nine ? (match.nine === 'front' ? 'Front nine' : 'Back nine') : `${match.holes} holes`,
+            `Par ${played.par}`,
+            tee?.name,
+            formatDay(match.played_on),
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </T>
-        <T variant="label" style={{ color: match.kind === 'major' ? c.accentText : c.muted }}>
-          {match.kind.toUpperCase()}
-          {match.status === 'final' ? ' · FINAL' : ''}
-        </T>
-      </Row>
+      </View>
       <ErrorText error={saveError ?? error} />
       {!editable && match.status === 'open' ? (
-        <T variant="label" style={{ color: c.danger }}>
-          ● WATCHING LIVE · scores update on their own
+        <T variant="eyebrow" style={{ color: c.danger }}>
+          ● Watching live · scores update on their own
         </T>
       ) : null}
 
@@ -148,9 +159,12 @@ export default function MatchScreen() {
           {mode === 'holes' ? (
             <>
               <Row style={{ justifyContent: 'space-between' }}>
-                <Button title="‹" kind="secondary" disabled={hole === 0} onPress={() => setHole(hole - 1)} />
+                <Button title="‹" kind="secondary" compact disabled={hole === 0} onPress={() => setHole(hole - 1)} />
                 <View style={{ alignItems: 'center' }}>
-                  <T variant="h1">Hole {hole + 1 + holeOffset}</T>
+                  <T variant="eyebrow" muted>
+                    Hole
+                  </T>
+                  <T variant="score">{hole + 1 + holeOffset}</T>
                   <T variant="label" muted>
                     {parOf(hole) != null ? `Par ${parOf(hole)}` : 'Par –'}
                     {played.strokeIndex ? ` · SI ${played.strokeIndex[hole]}` : ''}
@@ -159,6 +173,7 @@ export default function MatchScreen() {
                 <Button
                   title="›"
                   kind="secondary"
+                  compact
                   disabled={hole === played.holes - 1}
                   onPress={() => setHole(hole + 1)}
                 />
@@ -232,45 +247,70 @@ export default function MatchScreen() {
         offset={holeOffset}
       />
 
-      <Card>
-        <T variant="h2">{match.status === 'final' ? 'Result' : 'Standings so far'}</T>
+      {myResult ? (
+        <Row style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <View>
+            <T variant="eyebrow" muted>
+              Your gross
+            </T>
+            <T variant="score" style={{ fontSize: 56, lineHeight: 54 }}>
+              {myResult.gross ?? '–'}
+            </T>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <T variant="eyebrow" muted>
+              Points
+            </T>
+            <T variant="score" style={{ fontSize: 56, lineHeight: 54, color: c.accentText }}>
+              +{myResult.total}
+            </T>
+          </View>
+        </Row>
+      ) : null}
+
+      <Section title={match.status === 'final' ? 'Result' : 'Standings so far'} right={<T variant="eyebrow" muted>{settings.scoring}</T>} />
+      <View style={{ marginTop: -space.s }}>
         {results.map((r) => {
           const p = match.match_players.find((x) => x.user_id === r.userId)!;
+          const lead = r.position === 1 && r.score != null;
           return (
-            <Row key={r.userId} style={{ minHeight: 48 }}>
-              <T variant="mono" style={{ width: 36 }}>
+            <Row
+              key={r.userId}
+              style={{
+                gap: space.m,
+                paddingVertical: space.m,
+                paddingHorizontal: space.m,
+                borderRadius: lead ? radius.input : 0,
+                backgroundColor: lead ? c.leader : undefined,
+                borderBottomWidth: lead ? 0 : 1,
+                borderColor: c.border,
+              }}>
+              <T style={{ width: 28, textAlign: 'center', fontFamily: fonts.num, fontSize: 22, color: lead ? c.onLeader : c.text }}>
                 {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
               </T>
               <View style={{ flex: 1 }}>
-                <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(r.userId)}</T>
-                <T variant="label" muted>
+                <T style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: lead ? c.onLeader : c.text }}>{nameOf(r.userId)}</T>
+                <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
                   {teeOf(p)?.name ?? ''} · CH {p.course_handicap}
                   {r.gross != null ? ` · ${r.gross} gross · ${r.net} net` : ' · no score yet'}
+                  {r.bonusPoints ? ` · +${r.bonusPoints} bonus` : ''}
                 </T>
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <T variant="mono" style={{ fontSize: 18 }}>
-                  {r.total}
-                </T>
-                {r.bonusPoints ? (
-                  <T variant="label" muted>
-                    incl. +{r.bonusPoints} bonus
-                  </T>
-                ) : null}
-              </View>
+              <T style={{ fontFamily: fonts.num, fontSize: 28, color: lead ? c.onLeader : c.text }}>{r.total}</T>
             </Row>
           );
         })}
-        {results.some((r) => r.tiebreakNote) ? (
-          <T variant="label" muted>
-            Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
-          </T>
-        ) : null}
+      </View>
+      {results.some((r) => r.tiebreakNote) ? (
         <T variant="label" muted>
-          Ranked on {settings.scoring} score
-          {match.kind === 'minor' ? `, minor points × ${settings.minorMultiplier}` : ''}.
+          Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
         </T>
-      </Card>
+      ) : null}
+      {match.kind === 'minor' ? (
+        <T variant="label" muted>
+          Minor match: points × {settings.minorMultiplier}.
+        </T>
+      ) : null}
 
       {settings.tiebreak === 'playoff' && editable && (tied.length > 0 || match.match_players.some((p) => p.playoff_rank != null)) ? (
         <Card>
@@ -366,29 +406,55 @@ function Stepper({
   onPlus: () => void;
   onClear: () => void;
 }) {
-  const c = usePalette();
-  const under = value != null && par != null && value < par;
   return (
     <Row>
-      <Button title="−" kind="secondary" onPress={onMinus} style={{ paddingHorizontal: space.l }} />
-      <Pressable onLongPress={onClear} style={{ width: 52, alignItems: 'center' }}>
-        <View
-          style={{
-            width: 46,
-            height: 46,
-            borderRadius: 23,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: under ? 2 : 0,
-            borderColor: c.danger,
-          }}>
-          <T variant="mono" style={{ fontSize: 26, color: under ? c.danger : c.text }}>
-            {value ?? '–'}
-          </T>
-        </View>
+      <Button title="−" kind="secondary" compact onPress={onMinus} style={{ width: 48 }} />
+      <Pressable onLongPress={onClear} style={{ width: 56, alignItems: 'center' }}>
+        <ScoreMark score={value} par={par} size={46} fontSize={26} />
       </Pressable>
-      <Button title="+" kind="secondary" onPress={onPlus} style={{ paddingHorizontal: space.l }} />
+      <Button title="+" kind="secondary" compact onPress={onPlus} style={{ width: 48 }} />
     </Row>
+  );
+}
+
+/**
+ * Paper-scorecard marks from the brand book: birdie circled in red, eagle double circle,
+ * bogey square, double bogey (or worse) double square, par plain.
+ */
+function ScoreMark({ score, par, size = 24, fontSize = 16 }: { score: number | null; par: number | null; size?: number; fontSize?: number }) {
+  const c = usePalette();
+  const diff = score != null && par != null ? score - par : 0;
+  const red = diff < 0;
+  const color = red ? c.danger : c.text;
+  const line = red ? c.danger : c.muted;
+  const round = diff < 0;
+  const double = diff <= -2 || diff >= 2;
+  const ring = diff !== 0;
+  const inner = double ? size - 8 : size;
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: ring && double ? 1.5 : 0,
+        borderColor: line,
+        borderRadius: round ? size / 2 : 3,
+      }}>
+      <View
+        style={{
+          width: inner,
+          height: inner,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: ring ? 1.5 : 0,
+          borderColor: line,
+          borderRadius: round ? inner / 2 : 2,
+        }}>
+        <Text style={{ fontFamily: fonts.num, fontSize, color, lineHeight: fontSize * 1.1 }}>{score ?? '–'}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -408,83 +474,77 @@ function Scorecard({
   onPickHole: (i: number) => void;
 }) {
   const c = usePalette();
-  const cols = [...Array(holes).keys()];
-  const cell = { width: 34, alignItems: 'center' as const, justifyContent: 'center' as const, height: 34 };
+  const blocks = holes === 18 ? [0, 9] : [0];
   const sum = (xs: (number | null | undefined)[]) =>
-    xs.every((x) => x != null) && xs.length ? (xs as number[]).reduce((a, b) => a + b, 0) : '';
+    xs.length && xs.every((x) => x != null) ? (xs as number[]).reduce((a, b) => a + b, 0) : '';
+  const cell = { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const };
+  const nameW = 56;
   return (
-    <Card style={{ padding: space.s }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View>
-          <Row style={{ gap: 0 }}>
-            <View style={{ width: 84 }}>
-              <T variant="label" muted>
-                HOLE
-              </T>
-            </View>
-            {cols.map((i) => (
-              <Pressable
-                key={i}
-                onPress={() => onPickHole(i)}
-                style={[cell, current === i && { backgroundColor: c.accent, borderRadius: radius.small }]}>
-                <T variant="label" style={current === i ? { color: c.onAccent } : undefined}>
-                  {i + 1 + offset}
-                </T>
-              </Pressable>
-            ))}
-            <View style={[cell, { width: 44 }]}>
-              <T variant="label">TOT</T>
-            </View>
-          </Row>
-          {pars ? (
-            <Row style={{ gap: 0 }}>
-              <View style={{ width: 84 }}>
-                <T variant="label" muted>
-                  PAR
+    <View style={{ gap: space.s }}>
+      {blocks.map((start) => {
+        const cols = [...Array(9).keys()].map((k) => start + k);
+        return (
+          <View key={start} style={{ borderWidth: 1, borderColor: c.border, borderRadius: radius.input, overflow: 'hidden' }}>
+            <Row style={{ gap: 0, backgroundColor: c.surface, height: 26 }}>
+              <View style={{ width: nameW, paddingLeft: space.s }}>
+                <T variant="eyebrow" muted>
+                  {holes === 18 ? (start === 0 ? 'Out' : 'In') : 'Hole'}
                 </T>
               </View>
               {cols.map((i) => (
-                <View key={i} style={cell}>
-                  <T variant="label" muted>
-                    {pars[i]}
+                <Pressable
+                  key={i}
+                  onPress={() => onPickHole(i)}
+                  style={[cell, { height: 26 }, current === i && { backgroundColor: c.accent }]}>
+                  <T variant="eyebrow" style={{ color: current === i ? c.onAccent : c.muted }}>
+                    {i + 1 + offset}
+                  </T>
+                </Pressable>
+              ))}
+              <View style={[cell, { maxWidth: 36 }]} />
+            </Row>
+            {pars ? (
+              <Row style={{ gap: 0, backgroundColor: c.surface, height: 22 }}>
+                <View style={{ width: nameW, paddingLeft: space.s }}>
+                  <T variant="eyebrow" muted>
+                    Par
                   </T>
                 </View>
-              ))}
-              <View style={[cell, { width: 44 }]}>
-                <T variant="label" muted>
-                  {sum(pars)}
-                </T>
-              </View>
-            </Row>
-          ) : null}
-          {players.map((p) => (
-            <Row key={p.name} style={{ gap: 0, borderTopWidth: 1, borderColor: c.border }}>
-              <View style={{ width: 84 }}>
-                <T variant="label" numberOfLines={1}>
-                  {p.name}
-                </T>
-              </View>
-              {cols.map((i) => {
-                const s = p.scores[i];
-                const under = s != null && pars && s < pars[i];
-                return (
+                {cols.map((i) => (
                   <View key={i} style={cell}>
-                    <T variant="mono" style={{ fontSize: 14, color: under ? c.danger : c.text }}>
-                      {s ?? '·'}
+                    <T variant="eyebrow" muted>
+                      {pars[i]}
                     </T>
                   </View>
-                );
-              })}
-              <View style={[cell, { width: 44 }]}>
-                <T variant="mono" style={{ fontSize: 14 }}>
-                  {sum(cols.map((i) => p.scores[i]))}
-                </T>
-              </View>
-            </Row>
-          ))}
-        </View>
-      </ScrollView>
-    </Card>
+                ))}
+                <View style={[cell, { maxWidth: 36 }]}>
+                  <T variant="eyebrow" muted>
+                    {sum(cols.map((i) => pars[i]))}
+                  </T>
+                </View>
+              </Row>
+            ) : null}
+            {players.map((p) => (
+              <Row key={p.name} style={{ gap: 0, height: 38, borderTopWidth: 1, borderColor: c.border }}>
+                <View style={{ width: nameW, paddingLeft: space.s }}>
+                  <T variant="label" numberOfLines={1} style={{ fontFamily: fonts.bodyBold }}>
+                    {p.name}
+                  </T>
+                </View>
+                {cols.map((i) => (
+                  <View key={i} style={cell}>
+                    {p.scores[i] != null ? <ScoreMark score={p.scores[i]!} par={pars?.[i] ?? null} /> : <T muted>·</T>}
+                  </View>
+                ))}
+                <View style={[cell, { maxWidth: 36 }]}>
+                  <T style={{ fontFamily: fonts.num, fontSize: 16 }}>{sum(cols.map((i) => p.scores[i]))}</T>
+                </View>
+              </Row>
+            ))}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -513,6 +573,7 @@ function Bonuses({
   const [customPoints, setCustomPoints] = useState('5');
   const [hole, setHole] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  const c = usePalette();
   const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? '';
 
   const add = () => {
@@ -535,16 +596,23 @@ function Bonuses({
   return (
     <Card>
       <T variant="h2">Bonus points</T>
-      {bonuses.length === 0 ? <T muted>None yet.</T> : null}
+      {bonuses.length === 0 ? <T muted>None yet. Log the cool shots here.</T> : null}
       {bonuses.map((b) => (
-        <Row key={b.id} style={{ justifyContent: 'space-between' }}>
-          <T style={{ flex: 1 }}>
-            {nameOf(b.user_id)}: {b.label}
-            {b.hole ? ` (hole ${b.hole})` : ''}
-          </T>
-          <T variant="mono">+{Number(b.points)}</T>
+        <Row
+          key={b.id}
+          style={{ justifyContent: 'space-between', backgroundColor: c.bg, borderRadius: radius.input, padding: space.m }}>
+          <View style={{ flex: 1 }}>
+            <T>
+              {b.label}
+              {b.hole ? `, hole ${b.hole}` : ''}
+            </T>
+            <T variant="label" muted>
+              {nameOf(b.user_id)}
+            </T>
+          </View>
+          <T style={{ fontFamily: fonts.num, fontSize: 24, color: c.accentText }}>+{Number(b.points)}</T>
           {editable && canRemove(b.created_by) ? (
-            <Button title="✕" kind="secondary" style={{ paddingHorizontal: space.m }} onPress={() => onRemove(b.id)} />
+            <Button title="✕" kind="secondary" compact onPress={() => onRemove(b.id)} />
           ) : null}
         </Row>
       ))}
@@ -610,4 +678,9 @@ function Commentary({ lines, offset }: { lines: CommentaryLine[]; offset: number
       ) : null}
     </Card>
   );
+}
+
+function formatDay(iso: string) {
+  const d = new Date(`${iso}T12:00:00`);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
