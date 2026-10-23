@@ -1,0 +1,519 @@
+{
+  "_source": "Club scorecards (screenshots from Roko, 2026-10-23): scorecard-championship.png, scorecard-executive.png. Lengths in metres. Ratings are 18-hole WHS values.",
+  "club": {
+    "name": "Riverside Golf Zagreb",
+    "formerName": "Golf & Country Club Zagreb",
+    "city": "Zagreb",
+    "country": "Croatia",
+    "website": "https://riversidegolf.hr/"
+  },
+  "courses": [
+    {
+      "id": "riverside-championship",
+      "name": "Riverside Championship",
+      "physicalHoles": 18,
+      "holes": 18,
+      "par": 72,
+      "units": "meters",
+      "tees": [
+        {
+          "id": "white",
+          "name": "White",
+          "color": "#FFFFFF",
+          "lengthMeters": {
+            "out": 3208,
+            "in": 3224,
+            "total": 6432
+          },
+          "ratings": {
+            "men": {
+              "par": 72,
+              "courseRating": 74.8,
+              "slope": 143
+            },
+            "ladies": {
+              "par": 72,
+              "courseRating": 75.0,
+              "slope": 146
+            }
+          }
+        },
+        {
+          "id": "yellow",
+          "name": "Yellow",
+          "color": "#F7E21B",
+          "lengthMeters": {
+            "out": 2980,
+            "in": 3006,
+            "total": 5986
+          },
+          "ratings": {
+            "men": {
+              "par": 72,
+              "courseRating": 72.3,
+              "slope": 138
+            },
+            "ladies": {
+              "par": 72,
+              "courseRating": 72.4,
+              "slope": 140
+            }
+          }
+        },
+        {
+          "id": "blue",
+          "name": "Blue",
+          "color": "#4F86F7",
+          "lengthMeters": {
+            "out": 2788,
+            "in": 2843,
+            "total": 5631
+          },
+          "ratings": {
+            "men": {
+              "par": 72,
+              "courseRating": 70.4,
+              "slope": 134
+            },
+            "ladies": {
+              "par": 72,
+              "courseRating": 76.5,
+              "slope": 139
+            }
+          }
+        },
+        {
+          "id": "red",
+          "name": "Red",
+          "color": "#FF0000",
+          "lengthMeters": {
+            "out": 2610,
+            "in": 2634,
+            "total": 5244
+          },
+          "ratings": {
+            "men": {
+              "par": 72,
+              "courseRating": 68.1,
+              "slope": 128
+            },
+            "ladies": {
+              "par": 72,
+              "courseRating": 74.0,
+              "slope": 135
+            }
+          }
+        }
+      ],
+      "holeData": [
+        {
+          "hole": 1,
+          "par": 4,
+          "strokeIndex": 11,
+          "lengthMeters": {
+            "white": 372,
+            "yellow": 340,
+            "blue": 321,
+            "red": 302
+          }
+        },
+        {
+          "hole": 2,
+          "par": 3,
+          "strokeIndex": 17,
+          "lengthMeters": {
+            "white": 166,
+            "yellow": 142,
+            "blue": 128,
+            "red": 109
+          }
+        },
+        {
+          "hole": 3,
+          "par": 4,
+          "strokeIndex": 5,
+          "lengthMeters": {
+            "white": 366,
+            "yellow": 335,
+            "blue": 300,
+            "red": 282
+          }
+        },
+        {
+          "hole": 4,
+          "par": 5,
+          "strokeIndex": 9,
+          "lengthMeters": {
+            "white": 498,
+            "yellow": 470,
+            "blue": 442,
+            "red": 423
+          }
+        },
+        {
+          "hole": 5,
+          "par": 4,
+          "strokeIndex": 1,
+          "lengthMeters": {
+            "white": 385,
+            "yellow": 355,
+            "blue": 344,
+            "red": 317
+          }
+        },
+        {
+          "hole": 6,
+          "par": 4,
+          "strokeIndex": 13,
+          "lengthMeters": {
+            "white": 345,
+            "yellow": 324,
+            "blue": 296,
+            "red": 278
+          }
+        },
+        {
+          "hole": 7,
+          "par": 3,
+          "strokeIndex": 15,
+          "lengthMeters": {
+            "white": 165,
+            "yellow": 149,
+            "blue": 134,
+            "red": 119
+          }
+        },
+        {
+          "hole": 8,
+          "par": 5,
+          "strokeIndex": 7,
+          "lengthMeters": {
+            "white": 520,
+            "yellow": 500,
+            "blue": 475,
+            "red": 448
+          }
+        },
+        {
+          "hole": 9,
+          "par": 4,
+          "strokeIndex": 3,
+          "lengthMeters": {
+            "white": 391,
+            "yellow": 365,
+            "blue": 348,
+            "red": 332
+          }
+        },
+        {
+          "hole": 10,
+          "par": 4,
+          "strokeIndex": 6,
+          "lengthMeters": {
+            "white": 362,
+            "yellow": 332,
+            "blue": 297,
+            "red": 270
+          }
+        },
+        {
+          "hole": 11,
+          "par": 3,
+          "strokeIndex": 18,
+          "lengthMeters": {
+            "white": 137,
+            "yellow": 119,
+            "blue": 111,
+            "red": 91
+          }
+        },
+        {
+          "hole": 12,
+          "par": 4,
+          "strokeIndex": 12,
+          "lengthMeters": {
+            "white": 322,
+            "yellow": 299,
+            "blue": 283,
+            "red": 272
+          }
+        },
+        {
+          "hole": 13,
+          "par": 5,
+          "strokeIndex": 14,
+          "lengthMeters": {
+            "white": 495,
+            "yellow": 473,
+            "blue": 452,
+            "red": 434
+          }
+        },
+        {
+          "hole": 14,
+          "par": 4,
+          "strokeIndex": 2,
+          "lengthMeters": {
+            "white": 414,
+            "yellow": 384,
+            "blue": 363,
+            "red": 341
+          }
+        },
+        {
+          "hole": 15,
+          "par": 5,
+          "strokeIndex": 10,
+          "lengthMeters": {
+            "white": 503,
+            "yellow": 476,
+            "blue": 456,
+            "red": 424
+          }
+        },
+        {
+          "hole": 16,
+          "par": 4,
+          "strokeIndex": 16,
+          "lengthMeters": {
+            "white": 342,
+            "yellow": 323,
+            "blue": 302,
+            "red": 285
+          }
+        },
+        {
+          "hole": 17,
+          "par": 3,
+          "strokeIndex": 8,
+          "lengthMeters": {
+            "white": 208,
+            "yellow": 187,
+            "blue": 177,
+            "red": 146
+          }
+        },
+        {
+          "hole": 18,
+          "par": 4,
+          "strokeIndex": 4,
+          "lengthMeters": {
+            "white": 441,
+            "yellow": 413,
+            "blue": 402,
+            "red": 371
+          }
+        }
+      ]
+    },
+    {
+      "id": "riverside-executive",
+      "name": "Riverside Executive",
+      "physicalHoles": 9,
+      "holes": 18,
+      "par": 72,
+      "units": "meters",
+      "note": "9 physical holes (par 36). An 18-hole round plays them twice; holes 10-18 repeat 1-9 with their own stroke index. A single 9 uses holes 1-9 (par 36).",
+      "tees": [
+        {
+          "id": "yellow",
+          "name": "Yellow",
+          "color": "#F7E21B",
+          "lengthMeters": {
+            "out": 2255,
+            "in": 2255,
+            "total": 4510
+          },
+          "ratings": {
+            "all": {
+              "par": 72,
+              "courseRating": 63.4,
+              "slope": 109
+            }
+          }
+        },
+        {
+          "id": "red",
+          "name": "Red",
+          "color": "#F03E4F",
+          "lengthMeters": {
+            "out": 2051,
+            "in": 2051,
+            "total": 4102
+          },
+          "ratings": {
+            "all": {
+              "par": 72,
+              "courseRating": 65.4,
+              "slope": 109
+            }
+          }
+        }
+      ],
+      "holeData": [
+        {
+          "hole": 1,
+          "par": 5,
+          "strokeIndex": 7,
+          "lengthMeters": {
+            "yellow": 379,
+            "red": 348
+          }
+        },
+        {
+          "hole": 2,
+          "par": 4,
+          "strokeIndex": 15,
+          "lengthMeters": {
+            "yellow": 236,
+            "red": 231
+          }
+        },
+        {
+          "hole": 3,
+          "par": 4,
+          "strokeIndex": 3,
+          "lengthMeters": {
+            "yellow": 216,
+            "red": 211
+          }
+        },
+        {
+          "hole": 4,
+          "par": 3,
+          "strokeIndex": 9,
+          "lengthMeters": {
+            "yellow": 99,
+            "red": 94
+          }
+        },
+        {
+          "hole": 5,
+          "par": 4,
+          "strokeIndex": 1,
+          "lengthMeters": {
+            "yellow": 304,
+            "red": 238
+          }
+        },
+        {
+          "hole": 6,
+          "par": 5,
+          "strokeIndex": 5,
+          "lengthMeters": {
+            "yellow": 435,
+            "red": 363
+          }
+        },
+        {
+          "hole": 7,
+          "par": 4,
+          "strokeIndex": 11,
+          "lengthMeters": {
+            "yellow": 267,
+            "red": 260
+          }
+        },
+        {
+          "hole": 8,
+          "par": 4,
+          "strokeIndex": 13,
+          "lengthMeters": {
+            "yellow": 233,
+            "red": 225
+          }
+        },
+        {
+          "hole": 9,
+          "par": 3,
+          "strokeIndex": 17,
+          "lengthMeters": {
+            "yellow": 86,
+            "red": 81
+          }
+        },
+        {
+          "hole": 10,
+          "par": 5,
+          "strokeIndex": 8,
+          "lengthMeters": {
+            "yellow": 379,
+            "red": 348
+          }
+        },
+        {
+          "hole": 11,
+          "par": 4,
+          "strokeIndex": 16,
+          "lengthMeters": {
+            "yellow": 236,
+            "red": 231
+          }
+        },
+        {
+          "hole": 12,
+          "par": 4,
+          "strokeIndex": 4,
+          "lengthMeters": {
+            "yellow": 216,
+            "red": 211
+          }
+        },
+        {
+          "hole": 13,
+          "par": 3,
+          "strokeIndex": 10,
+          "lengthMeters": {
+            "yellow": 99,
+            "red": 94
+          }
+        },
+        {
+          "hole": 14,
+          "par": 4,
+          "strokeIndex": 2,
+          "lengthMeters": {
+            "yellow": 304,
+            "red": 238
+          }
+        },
+        {
+          "hole": 15,
+          "par": 5,
+          "strokeIndex": 6,
+          "lengthMeters": {
+            "yellow": 435,
+            "red": 363
+          }
+        },
+        {
+          "hole": 16,
+          "par": 4,
+          "strokeIndex": 12,
+          "lengthMeters": {
+            "yellow": 267,
+            "red": 260
+          }
+        },
+        {
+          "hole": 17,
+          "par": 4,
+          "strokeIndex": 14,
+          "lengthMeters": {
+            "yellow": 233,
+            "red": 225
+          }
+        },
+        {
+          "hole": 18,
+          "par": 3,
+          "strokeIndex": 18,
+          "lengthMeters": {
+            "yellow": 86,
+            "red": 81
+          }
+        }
+      ]
+    }
+  ]
+}
