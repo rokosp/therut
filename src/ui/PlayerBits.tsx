@@ -1,7 +1,9 @@
 import { View } from 'react-native';
 
-import { Row, T } from './components';
-import { fonts, space, usePalette } from './theme';
+import type { Career } from '@/lib/stats';
+
+import { Row, Section, T } from './components';
+import { fonts, radius, space, usePalette } from './theme';
 
 /** App HCP in a solid card, own HCP in a dashed one, as in the brand book. */
 export function HcpCards({ app, appNote, own }: { app: number | null | undefined; appNote: string; own: number | null | undefined }) {
@@ -44,5 +46,65 @@ export function StatsRow({ items }: { items: { v: string | number; l: string }[]
         </View>
       ))}
     </Row>
+  );
+}
+
+const toPar = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : String(n));
+
+/** Lifetime numbers from every card: best rounds, then how each hole went against par. */
+export function CareerHighlights({ career }: { career: Career }) {
+  const c = usePalette();
+  if (career.rounds === 0) return null;
+  const tiles: { v: string | number; l: string; note?: string; tone?: 'good' | 'bad' }[] = [
+    { v: career.best18?.gross ?? '–', l: 'Best 18', note: career.best18 ? toPar(career.best18.toPar) : undefined },
+    { v: career.best9?.gross ?? '–', l: 'Best 9', note: career.best9 ? toPar(career.best9.toPar) : undefined },
+    { v: career.rounds, l: 'Rounds' },
+    { v: career.holesPlayed, l: 'Holes played' },
+    { v: career.holesPlayed ? (career.strokes / career.holesPlayed).toFixed(2) : '–', l: 'Strokes per hole' },
+    { v: career.strokes.toLocaleString('en-GB'), l: 'Total strokes' },
+    { v: career.aces, l: 'Holes in one', tone: 'good' },
+    { v: career.eagles, l: 'Eagles', tone: 'good' },
+    { v: career.birdies, l: 'Birdies', tone: 'good' },
+    { v: career.pars, l: 'Pars' },
+    { v: career.bogeys, l: 'Bogeys' },
+    { v: career.doubles, l: 'Doubles or worse', tone: 'bad' },
+  ];
+  return (
+    <View style={{ gap: space.s }}>
+      <Section title="Career highlights" />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s }}>
+        {tiles.map((t) => (
+          <View
+            key={t.l}
+            style={{
+              width: '31.5%',
+              flexGrow: 1,
+              backgroundColor: c.surface,
+              borderRadius: radius.input,
+              paddingVertical: space.s,
+              paddingHorizontal: space.s,
+              alignItems: 'center',
+            }}>
+            <T
+              style={{
+                fontFamily: fonts.num,
+                fontSize: 28,
+                lineHeight: 30,
+                color: t.tone === 'good' ? c.accentText : t.tone === 'bad' ? c.danger : c.text,
+              }}>
+              {t.v}
+            </T>
+            {t.note ? (
+              <T variant="eyebrow" muted>
+                {t.note}
+              </T>
+            ) : null}
+            <T variant="label" muted style={{ textAlign: 'center' }}>
+              {t.l}
+            </T>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }

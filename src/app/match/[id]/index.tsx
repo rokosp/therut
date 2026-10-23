@@ -23,6 +23,7 @@ import { matchHappenings, type Happening } from '@/lib/stats';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
+import { PlayerLink } from '@/ui/PlayerLink';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 export default function MatchScreen() {
@@ -130,6 +131,7 @@ export default function MatchScreen() {
       offset={holeOffset}
       pars={played.holePars}
       players={match.match_players.map((p) => ({
+        id: p.user_id,
         name: nameOf(p.user_id),
         scores: p.hole_scores ?? [],
         bonusHoles: match.bonus_awards
@@ -313,14 +315,16 @@ export default function MatchScreen() {
                     {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
                   </T>
                   <View style={{ flex: 1 }}>
-                    <T
-                      style={{
-                        fontFamily: fonts.bodyBold,
-                        fontSize: 16,
-                        color: lead ? c.onLeader : c.text,
-                      }}>
-                      {nameOf(r.userId)}
-                    </T>
+                    <PlayerLink id={r.userId}>
+                      <T
+                        style={{
+                          fontFamily: fonts.bodyBold,
+                          fontSize: 16,
+                          color: lead ? c.onLeader : c.text,
+                        }}>
+                        {nameOf(r.userId)}
+                      </T>
+                    </PlayerLink>
                     <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
                       {teeOf(p)?.name ?? ''}
                       {showScores
@@ -467,14 +471,16 @@ export default function MatchScreen() {
                     {r.position == null ? '–' : `${r.tied ? 'T' : ''}${r.position}`}
                   </T>
                   <View style={{ flex: 1 }}>
-                    <T
-                      style={{
-                        fontFamily: fonts.bodyBold,
-                        fontSize: 16,
-                        color: lead ? c.onLeader : c.text,
-                      }}>
-                      {nameOf(r.userId)}
-                    </T>
+                    <PlayerLink id={r.userId}>
+                      <T
+                        style={{
+                          fontFamily: fonts.bodyBold,
+                          fontSize: 16,
+                          color: lead ? c.onLeader : c.text,
+                        }}>
+                        {nameOf(r.userId)}
+                      </T>
+                    </PlayerLink>
                     <T variant="label" style={{ color: lead ? c.onLeader : c.muted }}>
                       {teeOf(p)?.name ?? ''}
                       {showScores
@@ -699,7 +705,7 @@ function Scorecard({
   holes: number;
   offset: number;
   pars: number[] | null;
-  players: { name: string; scores: (number | null)[]; bonusHoles?: number[] }[];
+  players: { id: string; name: string; scores: (number | null)[]; bonusHoles?: number[] }[];
   current: number | null;
   onPickHole: (i: number) => void;
 }) {
@@ -767,18 +773,18 @@ function Scorecard({
             ) : null}
             {players.map((p) => (
               <Row
-                key={p.name}
+                key={p.id}
                 style={{
                   gap: 0,
                   height: 38,
                   borderTopWidth: 1,
                   borderColor: c.border,
                 }}>
-                <View style={{ width: nameW, paddingLeft: space.s }}>
+                <PlayerLink id={p.id} style={{ width: nameW, paddingLeft: space.s }}>
                   <T variant="label" numberOfLines={1} style={{ fontFamily: fonts.bodyBold }}>
                     {p.name}
                   </T>
-                </View>
+                </PlayerLink>
                 {cols.map((i) => (
                   <View
                     key={i}
@@ -891,9 +897,11 @@ function Bonuses({
               {b.label}
               {b.hole ? `, hole ${b.hole}` : ''}
             </T>
-            <T variant="label" muted>
-              {nameOf(b.user_id)}
-            </T>
+            <PlayerLink id={b.user_id}>
+              <T variant="label" muted>
+                {nameOf(b.user_id)}
+              </T>
+            </PlayerLink>
           </View>
           <T style={{ fontFamily: fonts.num, fontSize: 24, color: c.accentText }}>+{Number(b.points)}</T>
           {editable && canRemove(b.created_by) ? (

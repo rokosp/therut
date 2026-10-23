@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { matchHappenings, seasonAwards, type SeasonCard } from '../stats';
+import { careerHighlights, matchHappenings, seasonAwards, type SeasonCard } from '../stats';
 
 const pars = [4, 3, 5, 4, 4, 3, 5, 4, 4];
 
@@ -57,5 +57,26 @@ describe('seasonAwards', () => {
     const awards = seasonAwards([card('a', pars)]);
     expect(awards.find((a) => a.key === 'birdies')).toBeUndefined();
     expect(awards.find((a) => a.key === 'worst')).toBeUndefined();
+  });
+});
+
+describe('careerHighlights', () => {
+  it('adds up holes, strokes and scores against par', () => {
+    const c = careerHighlights([
+      { holes: 9, holeScores: [3, 3, 5, 4, 4, 1, 5, 4, 8], holePars: pars, gross: 37, par: 36 },
+      { holes: 18, holeScores: null, holePars: null, gross: 90, par: 72 },
+      { holes: 9, holeScores: [5, null, null, null, null, null, null, null, null], holePars: pars, gross: null, par: 36 },
+    ]);
+    expect(c.rounds).toBe(3);
+    expect(c.holesPlayed).toBe(9 + 18 + 1);
+    expect(c.strokes).toBe(37 + 90 + 5);
+    expect(c.aces).toBe(1);
+    expect(c.eagles).toBe(0); // the ace on a par 3 counts as an ace, not an eagle
+    expect(c.birdies).toBe(1);
+    expect(c.pars).toBe(6);
+    expect(c.bogeys).toBe(1);
+    expect(c.doubles).toBe(1);
+    expect(c.best9).toEqual({ gross: 37, toPar: 1 });
+    expect(c.best18).toEqual({ gross: 90, toPar: 18 });
   });
 });

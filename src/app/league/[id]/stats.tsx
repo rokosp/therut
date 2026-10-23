@@ -7,6 +7,7 @@ import { buildStandings } from '@/lib/standings';
 import { seasonAwards, type SeasonCard } from '@/lib/stats';
 import { useLoad } from '@/lib/useLoad';
 import { Fireworks } from '@/ui/Fireworks';
+import { PlayerLink } from '@/ui/PlayerLink';
 import { Avatar, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
@@ -166,7 +167,16 @@ export default function SeasonStats() {
               }}>
               {a.value}
             </T>
-            <T style={{ fontFamily: fonts.bodyBold }}>{names(a.userIds.map(nameOf))}</T>
+            <Row style={{ flexWrap: 'wrap', gap: 0 }}>
+              {a.userIds.map((uid, k) => (
+                <PlayerLink key={uid} id={uid}>
+                  <T style={{ fontFamily: fonts.bodyBold }}>
+                    {nameOf(uid)}
+                    {k < a.userIds.length - 2 ? ', ' : k === a.userIds.length - 2 ? ' & ' : ''}
+                  </T>
+                </PlayerLink>
+              ))}
+            </Row>
             <T variant="label" muted>
               {a.detail}
             </T>
@@ -177,4 +187,3 @@ export default function SeasonStats() {
   );
 }
 
-const names = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} & ${xs[xs.length - 1]}`);

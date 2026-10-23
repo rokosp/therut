@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Avatar, Button, Card, ErrorText, Field, Row, Screen, Section, T } from '@/ui/components';
 import { Friends } from '@/ui/Friends';
-import { HcpCards, StatsRow } from '@/ui/PlayerBits';
+import { CareerHighlights, HcpCards, StatsRow } from '@/ui/PlayerBits';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 export default function ProfileScreen() {
@@ -116,6 +116,7 @@ export default function ProfileScreen() {
           { v: data?.stats.leagueWins ?? '–', l: 'Leagues\nwon' },
         ]}
       />
+      {data?.stats ? <CareerHighlights career={data.stats.career} /> : null}
 
       <Friends />
 

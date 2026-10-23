@@ -10,6 +10,7 @@ import { stablefordPoints } from '@/lib/scoring';
 import { strokesPerHole } from '@/lib/handicap';
 import { withDefaults } from '@/lib/types';
 import { Button, Card, Row, T, Tag } from '@/ui/components';
+import { PlayerLink } from '@/ui/PlayerLink';
 import { fonts, space, usePalette } from '@/ui/theme';
 
 /** Match summary with a mini leaderboard and the latest commentary line. */
@@ -73,7 +74,9 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
       {rows.map((r, i) => (
         <Row key={r.id} style={{ minHeight: 36 }}>
           <T style={{ width: 24, fontFamily: fonts.num, fontSize: 20 }}>{i + 1}</T>
-          <T style={{ flex: 1, fontFamily: fonts.bodyBold }}>{nameOf(r.id)}</T>
+          <PlayerLink id={r.id} style={{ flex: 1 }}>
+            <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(r.id)}</T>
+          </PlayerLink>
           <T variant="label" muted style={{ width: 64, textAlign: 'right' }}>
             {r.thru === 0 ? 'not started' : r.thru === played.holes ? 'F' : `thru ${r.thru}`}
           </T>
@@ -165,7 +168,9 @@ function TopThree({ match, courses, profiles }: { match: LiveMatch; courses: Cou
           <T style={{ width: 28, fontFamily: fonts.num, fontSize: 20, color: r.position === 1 ? c.accentText : c.text }}>
             {`${r.tied ? 'T' : ''}${r.position}`}
           </T>
-          <T style={{ flex: 1, fontFamily: fonts.bodyBold }}>{displayName(profiles.find((p) => p.id === r.userId))}</T>
+          <PlayerLink id={r.userId} style={{ flex: 1 }}>
+            <T style={{ fontFamily: fonts.bodyBold }}>{displayName(profiles.find((p) => p.id === r.userId))}</T>
+          </PlayerLink>
           <T variant="label" muted>
             {stableford ? 'pts' : r.gross != null ? toPar(r.gross - played.par) : ''}
           </T>

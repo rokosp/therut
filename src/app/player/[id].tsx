@@ -20,7 +20,7 @@ import { useAction, useLoad } from '@/lib/useLoad';
 import { Avatar, Button, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
 import { MatchCard, PastMatchCard } from '@/ui/MatchCard';
-import { HcpCards, StatsRow } from '@/ui/PlayerBits';
+import { CareerHighlights, HcpCards, StatsRow } from '@/ui/PlayerBits';
 import { fonts, space } from '@/ui/theme';
 
 export default function PlayerScreen() {
@@ -137,6 +137,7 @@ export default function PlayerScreen() {
               { v: full.stats.leagueWins, l: 'Leagues\nwon' },
             ]}
           />
+          <CareerHighlights career={full.stats.career} />
           <Section title="Match history" />
           {full.history.matches.length === 0 ? <T muted>No matches yet.</T> : null}
           {full.history.matches.map((m) =>

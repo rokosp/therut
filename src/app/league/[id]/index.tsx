@@ -8,6 +8,7 @@ import { buildStandings } from '@/lib/standings';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
+import { PlayerLink } from '@/ui/PlayerLink';
 import { fonts, space, usePalette } from '@/ui/theme';
 
 type Filter = 'season' | 'major' | 'minor';
@@ -176,7 +177,9 @@ export default function LeagueScreen() {
       <Card>
         {members.map((m) => (
           <Row key={m.user_id} style={{ justifyContent: 'space-between', minHeight: 32 }}>
-            <T style={{ fontFamily: fonts.bodyBold }}>{displayName(m.profiles)}</T>
+            <PlayerLink id={m.user_id}>
+              <T style={{ fontFamily: fonts.bodyBold }}>{displayName(m.profiles)}</T>
+            </PlayerLink>
             <T variant="eyebrow" muted>
               {m.role === 'admin' ? 'Admin' : ''}
             </T>

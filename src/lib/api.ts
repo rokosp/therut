@@ -2,6 +2,7 @@ import { playedHoles, type CourseInfo, type TeeInfo } from './course';
 import { calculateHandicap, type HandicapResult, type HandicapRound } from './handicap';
 import { scoreMatch, type PlayerResult } from './scoring';
 import { buildStandings } from './standings';
+import { careerHighlights, type CareerRound } from './stats';
 import { supabase } from './supabase';
 import { withDefaults, type LeagueSettings, type MatchFormat, type MatchKind } from './types';
 
@@ -128,7 +129,7 @@ export async function getProfile(id: string): Promise<Profile & { created_at: st
 
 /** Matches played and won, plus leagues played and won (finished seasons only), that I can see. */
 export async function playerStats(userId: string) {
-  const empty = { rounds: 0, avg18: null as number | null, wins: 0, leagues: 0, leagueWins: 0 };
+  const empty = { rounds: 0, avg18: null as number | null, wins: 0, leagues: 0, leagueWins: 0, career: careerHighlights([]) };
   const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as { match_id: string }[];
   if (mine.length === 0) return empty;
   const matches = check(
@@ -144,7 +145,20 @@ export async function playerStats(userId: string) {
   let rounds = 0;
   let wins = 0;
   const grosses: number[] = [];
+  const careerRounds: CareerRound[] = [];
   for (const m of matches) {
+    const mp = m.match_players.find((p) => p.user_id === userId);
+    if (mp) {
+      const { played } = holesFor(m, courses, mp.tee_id);
+      const complete = mp.hole_scores?.length === played.holes && mp.hole_scores.every((s) => s != null);
+      careerRounds.push({
+        holes: played.holes,
+        holeScores: mp.hole_scores,
+        holePars: played.holePars,
+        gross: complete ? (mp.hole_scores as number[]).reduce((a, b) => a + b, 0) : mp.gross,
+        par: played.par,
+      });
+    }
     const r = resultsFor(m, withDefaults(m.leagues?.settings), courses).find((x) => x.userId === userId);
     if (!r || r.gross == null) continue;
     rounds += 1;
@@ -165,7 +179,7 @@ export async function playerStats(userId: string) {
     );
     if (table.find((t) => t.userId === userId)?.rank === 1) leagueWins += 1;
   }
-  return { rounds, avg18, wins, leagues: leagueIds.length, leagueWins };
+  return { rounds, avg18, wins, leagues: leagueIds.length, leagueWins, career: careerHighlights(careerRounds) };
 }
 
 export async function updateProfile(id: string, patch: Partial<Omit<Profile, 'id'>>) {

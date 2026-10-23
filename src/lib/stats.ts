@@ -171,3 +171,66 @@ export function seasonAwards(cards: SeasonCard[]): Award[] {
   return out;
 }
 
+
+// Career ------------------------------------------------------------------
+
+export interface CareerRound {
+  holes: number;
+  holeScores: (number | null)[] | null;
+  holePars: number[] | null;
+  /** Total strokes, when the card is finished. */
+  gross: number | null;
+  par: number;
+}
+
+export interface Career {
+  rounds: number;
+  holesPlayed: number;
+  strokes: number;
+  aces: number;
+  eagles: number;
+  birdies: number;
+  pars: number;
+  bogeys: number;
+  doubles: number;
+  best18: { gross: number; toPar: number } | null;
+  best9: { gross: number; toPar: number } | null;
+}
+
+/** Lifetime totals from every scorecard: holes, strokes and how each hole went against par. */
+export function careerHighlights(rounds: CareerRound[]): Career {
+  const out: Career = {
+    rounds: 0, holesPlayed: 0, strokes: 0, aces: 0, eagles: 0, birdies: 0, pars: 0, bogeys: 0, doubles: 0,
+    best18: null, best9: null,
+  };
+  for (const r of rounds) {
+    const scored = (r.holeScores ?? []).filter((s): s is number => s != null && s > 0);
+    if (scored.length === 0 && r.gross == null) continue;
+    out.rounds += 1;
+    if (scored.length) {
+      out.holesPlayed += scored.length;
+      out.strokes += scored.reduce((a, b) => a + b, 0);
+    } else {
+      out.holesPlayed += r.holes;
+      out.strokes += r.gross!;
+    }
+    (r.holeScores ?? []).forEach((s, i) => {
+      const par = r.holePars?.[i];
+      if (s == null || s <= 0) return;
+      if (s === 1) out.aces += 1;
+      if (par == null) return;
+      const d = s - par;
+      if (d <= -2 && s !== 1) out.eagles += 1;
+      else if (d === -1) out.birdies += 1;
+      else if (d === 0) out.pars += 1;
+      else if (d === 1) out.bogeys += 1;
+      else if (d >= 2) out.doubles += 1;
+    });
+    if (r.gross != null) {
+      const key = r.holes === 18 ? 'best18' : 'best9';
+      const cur = out[key];
+      if (!cur || r.gross < cur.gross) out[key] = { gross: r.gross, toPar: r.gross - r.par };
+    }
+  }
+  return out;
+}
