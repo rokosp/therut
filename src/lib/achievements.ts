@@ -185,7 +185,14 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
 
     a('snowman', 'Fun', '8', 'Snowman', 'Card an 8 (or worse) on a hole.', snowmen),
     a('double-ds', 'Fun', '10+', "Double D's", 'Card a double-digit score on a hole.', doubleDs),
-    a('lone-wolf', 'Fun', 'SOLO', 'Lone Wolf', 'Play a round on your own.', rounds.filter((r) => r.solo).length),
+    a(
+      'lone-wolf',
+      'Fun',
+      'SG',
+      'Steven Glansberg',
+      'Play a round on your own. Okay Steven Glansberg.',
+      rounds.filter((r) => r.solo).length,
+    ),
     a(
       'early-bird',
       'Fun',
