@@ -27,8 +27,9 @@ import { brand, fonts, radius, space, usePalette } from '@/ui/theme';
 
 /** One tee per colour: the ladies' ratings stay saved, but the picker only shows the main set. */
 const teesOf = (c: Course) => {
-  const main = c.course_tees.filter((t) => !t.name.includes('Ladies'));
-  return main.length ? main : c.course_tees;
+  const current = c.course_tees.filter((t) => !t.retired);
+  const main = current.filter((t) => !t.name.includes('Ladies'));
+  return main.length ? main : current;
 };
 
 /** Move an HH:MM time by some minutes, staying within the day. */

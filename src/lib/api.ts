@@ -43,6 +43,8 @@ export interface Tee extends TeeInfo {
   course_id: string;
   name: string;
   sort_order: number;
+  /** An old layout kept for past matches; not offered for new ones. */
+  retired?: boolean;
 }
 
 export interface Course extends CourseInfo {
