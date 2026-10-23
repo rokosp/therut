@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { useState } from 'react';
 
-import { displayName, holesFor, resultsFor, type Course, type LiveMatch, type Profile } from '@/lib/api';
+import { displayName, holesFor, leagueTitle, resultsFor, type Course, type LiveMatch, type Profile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { buildCommentary } from '@/lib/commentary';
 import { stablefordPoints } from '@/lib/scoring';
@@ -99,7 +99,7 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
   );
 }
 
-const leagueLabel = (m: LiveMatch) => (m.league_id ? (m.leagues?.name ?? "Friend's league") : 'Casual round');
+const leagueLabel = (m: LiveMatch) => (m.league_id ? (m.leagues ? leagueTitle(m.leagues) : "Friend's league") : 'Casual round');
 
 /**
  * A finished match, kept short: tags, course, and one player's score against par.

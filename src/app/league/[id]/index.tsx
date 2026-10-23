@@ -49,6 +49,7 @@ export default function LeagueScreen() {
         }),
     );
   const nameOf = (uid: string) => displayName(members.find((m) => m.user_id === uid)?.profiles);
+  const shown = matches.filter((m) => filter === 'season' || m.kind === filter);
   const finals = matches.filter((m) => m.status === 'final' && (filter === 'season' || m.kind === filter));
   const table = buildStandings(
     members.map((m) => m.user_id),
@@ -74,6 +75,11 @@ export default function LeagueScreen() {
             : undefined,
         }}
       />
+      {league.season ? (
+        <T variant="eyebrow" muted>
+          Season {league.season}
+        </T>
+      ) : null}
       <ErrorText error={error} />
 
       {finished ? (
@@ -89,7 +95,7 @@ export default function LeagueScreen() {
 
       <Segmented
         options={[
-          { value: 'season', label: league.season ? `Season ${league.season}` : 'Season' },
+          { value: 'season', label: 'Season' },
           { value: 'major', label: 'Majors' },
           { value: 'minor', label: 'Minors' },
         ]}
@@ -139,9 +145,14 @@ export default function LeagueScreen() {
         <Button title="Season stats" kind="secondary" onPress={() => router.push(`/league/${id}/stats`)} style={{ flex: 1 }} />
       </Row>
 
-      <Section title={`Matches · ${matches.length}`} />
+      <Section
+        title={`${filter === 'major' ? 'Majors' : filter === 'minor' ? 'Minors' : 'Matches'} · ${shown.length}`}
+      />
+      {shown.length === 0 && matches.length > 0 ? (
+        <T muted>No {filter === 'major' ? 'majors' : 'minors'} played yet.</T>
+      ) : null}
       {matches.length === 0 ? <T muted>No matches yet. Add the first one after your next round.</T> : null}
-      {matches.map((m) => {
+      {shown.map((m) => {
         const course = courses.find((x) => x.id === m.course_id);
         const res = resultsFor(m, settings, courses);
         const winners = res.filter((r) => r.position === 1).map((r) => nameOf(r.userId));

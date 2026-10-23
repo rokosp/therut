@@ -405,7 +405,7 @@ export async function removeBonus(id: string) {
 
 export interface LiveMatch extends MatchRow {
   /** Null when the match is in a league I'm not in (I see it through a friend). */
-  leagues: { name: string; settings: Partial<LeagueSettings> } | null;
+  leagues: { name: string; season?: string | null; settings: Partial<LeagueSettings> } | null;
 }
 
 /** Matches still being played in my leagues or by my friends, with player names. */
@@ -413,7 +413,7 @@ export async function listLiveMatches(): Promise<{ matches: LiveMatch[]; profile
   const matches = check(
     await supabase
       .from('matches')
-      .select(`${MATCH_SELECT}, leagues(name, settings)`)
+      .select(`${MATCH_SELECT}, leagues(name, season, settings)`)
       .eq('status', 'open')
       .order('played_on', { ascending: false }),
   ) as LiveMatch[];
@@ -428,7 +428,7 @@ export async function playerMatches(userId: string, limit = 20): Promise<{ match
   const matches = check(
     await supabase
       .from('matches')
-      .select(`${MATCH_SELECT}, leagues(name, settings)`)
+      .select(`${MATCH_SELECT}, leagues(name, season, settings)`)
       .in(
         'id',
         mine.map((m) => m.match_id),
@@ -516,6 +516,12 @@ export function playingIndex(settings: LeagueSettings, app: number | null | unde
   const a = app ?? null;
   const s = self != null ? Number(self) : null;
   return settings.handicapSource === 'self' ? (s ?? a) : (a ?? s);
+}
+
+/** "Backoutsideboyz · Season 2", or just the name when there's no season. */
+export function leagueTitle(l: { name: string; season?: string | null } | null | undefined) {
+  if (!l) return '';
+  return l.season ? `${l.name} · Season ${l.season}` : l.name;
 }
 
 export function displayName(p: Pick<Profile, 'display_name' | 'nickname'> | undefined | null) {

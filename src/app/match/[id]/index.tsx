@@ -8,6 +8,7 @@ import {
   displayName,
   getMatchBundle,
   holesFor,
+  leagueTitle,
   listCourses,
   removeBonus,
   resultsFor,
@@ -150,6 +151,9 @@ export default function MatchScreen() {
           {match.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
           {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
         </Row>
+        <T variant="eyebrow" style={{ color: c.accentText }}>
+          {league ? leagueTitle(league) : 'Casual round'}
+        </T>
         <T variant="display" style={{ fontSize: 40, lineHeight: 40 }}>
           {course?.name ?? 'Match'}
         </T>
@@ -159,7 +163,6 @@ export default function MatchScreen() {
             `Par ${played.par}`,
             tee?.name,
             formatDay(match.played_on),
-            league?.name ?? (casual ? 'Casual round' : null),
           ]
             .filter(Boolean)
             .join(' · ')}
