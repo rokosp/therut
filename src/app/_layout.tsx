@@ -13,7 +13,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme, useWindowDimensions, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { fonts, usePalette } from '@/ui/theme';
@@ -68,10 +68,34 @@ function RootStack() {
   );
 }
 
+/** On a wide browser window, show the app inside a phone-sized frame so it can be tried on a computer. */
+function PhoneFrame({ children }: { children: React.ReactNode }) {
+  const { width, height } = useWindowDimensions();
+  if (Platform.OS !== 'web' || width < 600) return <>{children}</>;
+  return (
+    <View style={{ flex: 1, backgroundColor: '#E78F25', alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          width: 400,
+          height: Math.min(860, height - 48),
+          borderRadius: 36,
+          borderWidth: 10,
+          borderColor: '#0B2A1F',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(11, 42, 31, 0.35)',
+        }}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootStack />
-    </AuthProvider>
+    <PhoneFrame>
+      <AuthProvider>
+        <RootStack />
+      </AuthProvider>
+    </PhoneFrame>
   );
 }
