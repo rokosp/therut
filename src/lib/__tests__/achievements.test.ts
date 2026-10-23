@@ -40,6 +40,7 @@ describe('computeAchievements', () => {
     expect(get(list, 'ace').earned).toBe(true);
     expect(get(list, 'eagle').earned).toBe(false); // an ace isn't also an eagle
     expect(get(list, 'snowman').earned).toBe(true);
+    expect(get(list, 'double-ds').earned).toBe(false);
     expect(get(list, 'birdie-party').earned).toBe(true);
     expect(get(list, 'comeback').earned).toBe(true);
     expect(get(list, 'champion').earned).toBe(true);
@@ -80,5 +81,6 @@ describe('computeAchievements', () => {
     const eighteen = computeAchievements({ rounds: [round([...pars9, ...pars9].map((p) => p + 1))], leagueWins: 0 });
     expect(get(eighteen, 'broke-100').earned).toBe(true);
     expect(get(eighteen, 'broke-90').earned).toBe(false);
+    expect(get(eighteen, 'broke-140').earned).toBe(true);
   });
 });

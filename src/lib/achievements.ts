@@ -56,6 +56,7 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
   let eagles = 0;
   let aces = 0;
   let snowmen = 0;
+  let doubleDs = 0;
   let bestBirdiesInRound = 0;
   let bogeyFree9 = 0;
   let best18: number | null = null;
@@ -74,6 +75,7 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
       if (x == null) return;
       if (x === 1) aces += 1;
       if (x >= 8) snowmen += 1;
+      if (x >= 10) doubleDs += 1;
       const par = r.holePars?.[i];
       if (par == null) return;
       const d = x - par;
@@ -158,6 +160,10 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     a('birdie-party', 'Holes', '3B', 'Birdie Party', 'Make 3 birdies in one round.', bestBirdiesInRound, 3),
     a('pars-100', 'Holes', '100P', 'Par Machine', 'Make 100 pars.', pars, 100),
 
+    a('broke-140', 'Rounds', '139', 'Broke 140', 'Shoot under 140 on 18 holes.', broke(140)),
+    a('broke-130', 'Rounds', '129', 'Broke 130', 'Shoot under 130 on 18 holes.', broke(130)),
+    a('broke-120', 'Rounds', '119', 'Broke 120', 'Shoot under 120 on 18 holes.', broke(120)),
+    a('broke-110', 'Rounds', '109', 'Broke 110', 'Shoot under 110 on 18 holes.', broke(110)),
     a('broke-100', 'Rounds', '99', 'Broke 100', 'Shoot under 100 on 18 holes.', broke(100)),
     a('broke-90', 'Rounds', '89', 'Broke 90', 'Shoot under 90 on 18 holes.', broke(90)),
     a('broke-80', 'Rounds', '79', 'Broke 80', 'Shoot under 80 on 18 holes.', broke(80)),
@@ -178,6 +184,7 @@ export function computeAchievements(input: { rounds: AchRound[]; leagueWins: num
     a('strokes-10k', 'Strokes', '10K', 'Stroked It 10K', 'Hit 10,000 strokes.', strokes, 10000),
 
     a('snowman', 'Fun', '8', 'Snowman', 'Card an 8 (or worse) on a hole.', snowmen),
+    a('double-ds', 'Fun', '10+', "Double D's", 'Card a double-digit score on a hole.', doubleDs),
     a('lone-wolf', 'Fun', 'SOLO', 'Lone Wolf', 'Play a round on your own.', rounds.filter((r) => r.solo).length),
     a(
       'early-bird',
