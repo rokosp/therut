@@ -112,6 +112,13 @@ function breakTie(
   settings: LeagueSettings,
 ): { groups: MatchPlayerInput[][]; note: string } {
   const players = group.map((g) => g.p);
+  // A winner picked by hand (or a playoff result) beats every other tie breaker.
+  if (players.every((p) => p.playoffRank != null)) {
+    return {
+      groups: groupBy(players, (a, b) => a.playoffRank! - b.playoffRank!),
+      note: settings.tiebreak === 'playoff' ? 'Playoff' : 'Winner picked',
+    };
+  }
   if (settings.tiebreak === 'countback') {
     const sf = match.format === 'stableford' ? match.holePars : null;
     const keys = new Map(players.map((p) => [p, countbackKey(p, match.holes, settings.scoring === 'net', sf)]));
@@ -121,10 +128,7 @@ function breakTie(
     return { groups: groupBy(players, (a, b) => compareKeys(keys.get(a)!, keys.get(b)!)), note: 'Countback' };
   }
   if (settings.tiebreak === 'playoff') {
-    if (players.some((p) => p.playoffRank == null)) {
-      return { groups: [players], note: 'Playoff result not entered, points split' };
-    }
-    return { groups: groupBy(players, (a, b) => a.playoffRank! - b.playoffRank!), note: 'Playoff' };
+    return { groups: [players], note: 'Playoff result not entered, points split' };
   }
   return { groups: [players], note: 'Points split' };
 }
@@ -172,8 +176,7 @@ export function scoreMatch(
   const results: PlayerResult[] = [];
   let place = 1;
   for (const group of byScore) {
-    const { groups, note } =
-      group.length > 1 ? breakTie(group, match, settings) : { groups: [[group[0].p]], note: '' };
+    const { groups, note } = group.length > 1 ? breakTie(group, match, settings) : { groups: [[group[0].p]], note: '' };
     for (const sub of groups) {
       const slots = sub.map((_, i) => table[place - 1 + i] ?? 0);
       const each = round1(slots.reduce((a, b) => a + b, 0) / sub.length);

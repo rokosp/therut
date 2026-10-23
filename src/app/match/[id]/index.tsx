@@ -80,26 +80,29 @@ export default function MatchScreen() {
   const holeOffset = match.nine === 'back' ? 9 : 0;
 
   /** Update one player's row locally straight away, then save in order. */
-  const updatePlayer = (uid: string, patch: Partial<MatchPlayerRow>) => {
+  const updatePlayers = (patches: Record<string, Partial<MatchPlayerRow>>) => {
     setData({
       ...data,
       match: {
         ...match,
-        match_players: match.match_players.map((p) => (p.user_id === uid ? { ...p, ...patch } : p)),
+        match_players: match.match_players.map((p) => (patches[p.user_id] ? { ...p, ...patches[p.user_id] } : p)),
       },
     });
     lastEdit.current = Date.now();
-    pendingSaves.current += 1;
-    const prev = saveQueue.current.get(uid) ?? Promise.resolve();
-    const next = prev
-      .then(() => saveScore(match.id, uid, patch))
-      .then(() => setSaveError(null))
-      .catch((e: Error) => setSaveError(`Couldn't save: ${e.message}. Pull down to refresh.`))
-      .finally(() => {
-        pendingSaves.current -= 1;
-      });
-    saveQueue.current.set(uid, next);
+    for (const [uid, patch] of Object.entries(patches)) {
+      pendingSaves.current += 1;
+      const prev = saveQueue.current.get(uid) ?? Promise.resolve();
+      const next = prev
+        .then(() => saveScore(match.id, uid, patch))
+        .then(() => setSaveError(null))
+        .catch((e: Error) => setSaveError(`Couldn't save: ${e.message}. Pull down to refresh.`))
+        .finally(() => {
+          pendingSaves.current -= 1;
+        });
+      saveQueue.current.set(uid, next);
+    }
   };
+  const updatePlayer = (uid: string, patch: Partial<MatchPlayerRow>) => updatePlayers({ [uid]: patch });
 
   const setHoleScore = (p: MatchPlayerRow, value: number | null) => {
     const scores = [...(p.hole_scores ?? new Array(played.holes).fill(null))];
@@ -115,7 +118,16 @@ export default function MatchScreen() {
   const parOf = (i: number) => played.holePars?.[i] ?? null;
   const teeOf = (p: MatchPlayerRow) => holesFor(match, courses, p.tee_id).tee;
 
-  const tied = results.filter((r) => r.tied);
+  // Players level on score (before any tie breaker), so the match admin can pick a winner.
+  const tieGroups = Object.values(
+    results.reduce<Record<string, { position: number; ids: string[] }>>((acc, r) => {
+      if (r.score == null || !r.tiebreakNote) return acc;
+      const g = (acc[String(r.score)] ??= { position: r.position ?? 0, ids: [] });
+      g.position = Math.min(g.position, r.position ?? g.position);
+      g.ids.push(r.userId);
+      return acc;
+    }, {}),
+  ).sort((x, y) => x.position - y.position);
   const myResult = results.find((r) => r.userId === userId);
   const myStableford = stablefordPoints(
     match.match_players.find((p) => p.user_id === userId)?.hole_scores,
@@ -598,41 +610,48 @@ export default function MatchScreen() {
           </>
         )}
 
-        {settings.tiebreak === 'playoff' &&
-        editable &&
-        (tied.length > 0 || match.match_players.some((p) => p.playoff_rank != null)) ? (
+        {canManage && match.status === 'open' && tieGroups.length > 0 ? (
           <Card>
-            <T variant="title">Playoff</T>
+            <T variant="title">{settings.tiebreak === 'playoff' ? 'Playoff' : 'Pick the winner'}</T>
             <T variant="label" muted>
-              Enter the playoff finishing order for tied players (1 = winner).
+              {settings.tiebreak === 'playoff'
+                ? 'Tap who won the playoff.'
+                : 'Scores are level. Tap who wins the tie, or leave it to the league tie breaker.'}
             </T>
-            {match.match_players
-              .filter((p) => tied.some((t) => t.userId === p.user_id) || p.playoff_rank != null)
-              .map((p) => (
-                <Row key={p.user_id} style={{ justifyContent: 'space-between' }}>
-                  <T>{nameOf(p.user_id)}</T>
-                  <TextInput
-                    keyboardType="number-pad"
-                    defaultValue={p.playoff_rank != null ? String(p.playoff_rank) : ''}
-                    onEndEditing={(e) => {
-                      const n = parseInt(e.nativeEvent.text, 10);
-                      updatePlayer(p.user_id, {
-                        playoff_rank: Number.isNaN(n) ? null : n,
-                      });
-                    }}
-                    style={{
-                      width: 64,
-                      minHeight: 44,
-                      borderWidth: 1,
-                      borderColor: c.border,
-                      borderRadius: radius.small,
-                      color: c.text,
-                      textAlign: 'center',
-                      fontFamily: fonts.mono,
-                    }}
-                  />
-                </Row>
-              ))}
+            {tieGroups.map((g) => {
+              const rows = match.match_players.filter((p) => g.ids.includes(p.user_id));
+              const picked = rows.every((p) => p.playoff_rank != null)
+                ? rows.find((p) => p.playoff_rank === 1)?.user_id
+                : undefined;
+              return (
+                <View key={g.ids.join()} style={{ gap: space.xs }}>
+                  <T variant="eyebrow" muted>
+                    Tied for {ordinal(g.position)}
+                  </T>
+                  <Row style={{ flexWrap: 'wrap', gap: space.xs }}>
+                    {g.ids.map((uid) => (
+                      <Chip
+                        key={uid}
+                        label={nameOf(uid)}
+                        on={picked === uid}
+                        onPress={() =>
+                          updatePlayers(
+                            Object.fromEntries(
+                              g.ids.map((id) => [id, { playoff_rank: picked === uid ? null : id === uid ? 1 : 2 }]),
+                            ),
+                          )
+                        }
+                      />
+                    ))}
+                  </Row>
+                  {picked ? (
+                    <T variant="label" muted>
+                      {nameOf(picked)} takes it. Tap again to undo.
+                    </T>
+                  ) : null}
+                </View>
+              );
+            })}
           </Card>
         ) : null}
 
@@ -1156,3 +1175,6 @@ function formatDay(iso: string) {
   const d = new Date(`${iso}T12:00:00`);
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
+
+const ordinal = (n: number) =>
+  `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
