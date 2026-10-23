@@ -736,3 +736,33 @@ export function displayName(p: Pick<Profile, 'display_name' | 'nickname'> | unde
   if (!p) return 'Unknown';
   return p.nickname || p.display_name || 'Player';
 }
+
+// Trash talk ----------------------------------------------------------------
+
+export interface ChatLine {
+  id: string;
+  match_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+}
+
+export async function listChat(matchId: string): Promise<ChatLine[] | null> {
+  const res = await supabase
+    .from('match_chat')
+    .select('*')
+    .eq('match_id', matchId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  // null = the trash talk update hasn't been run in Supabase yet.
+  if (res.error) return null;
+  return res.data as ChatLine[];
+}
+
+export async function postChat(matchId: string, body: string) {
+  check(await supabase.from('match_chat').insert({ match_id: matchId, body: body.trim() }));
+}
+
+export async function deleteChat(id: string) {
+  check(await supabase.from('match_chat').delete().eq('id', id));
+}

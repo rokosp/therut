@@ -26,6 +26,8 @@ import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, 
 import { confirmAction } from '@/ui/confirm';
 import { Fireworks } from '@/ui/Fireworks';
 import { PlayerLink } from '@/ui/PlayerLink';
+import { TrashTalk } from '@/ui/TrashTalk';
+import { WeatherLine } from '@/ui/Weather';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 export default function MatchScreen() {
@@ -175,6 +177,10 @@ export default function MatchScreen() {
               .filter(Boolean)
               .join(' · ')}
           </T>
+          <WeatherLine
+            city={course?.city ?? course?.club_name}
+            startsAt={match.starts_at ?? `${match.played_on}T10:00:00`}
+          />
         </Card>
         <Section title={`Players · ${match.match_players.length}`} />
         {match.match_players.map((p) => (
@@ -654,6 +660,8 @@ export default function MatchScreen() {
             })}
           </Card>
         ) : null}
+
+        <TrashTalk matchId={match.id} userId={userId!} />
 
         {casual ? null : (
           <Bonuses

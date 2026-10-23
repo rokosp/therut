@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Tabs } from 'expo-router/tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable, View } from 'react-native';
 
 import { getProfile, listFriendships, listNotifications } from '@/lib/api';
@@ -10,6 +11,7 @@ import { Avatar, HeaderTitle, Row, T } from '@/ui/components';
 import { fonts, space, usePalette } from '@/ui/theme';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
   const c = usePalette();
   const { session, userId } = useAuth();
   // My photo for the header, and how many friend requests are waiting (shown on the Profile tab).
@@ -37,7 +39,13 @@ export default function TabsLayout() {
         headerTitleAlign: 'left',
         headerTitle: ({ children }) => <HeaderTitle title={children} />,
         sceneStyle: { backgroundColor: c.bg },
-        tabBarStyle: { backgroundColor: c.bg, borderTopColor: c.border, height: 56 },
+        // Android draws under the system navigation bar, so add its height below the tabs.
+        tabBarStyle: {
+          backgroundColor: c.bg,
+          borderTopColor: c.border,
+          height: 56 + insets.bottom,
+          paddingBottom: insets.bottom,
+        },
         tabBarActiveTintColor: c.primary,
         tabBarInactiveTintColor: c.muted,
         tabBarIconStyle: { display: 'none' },

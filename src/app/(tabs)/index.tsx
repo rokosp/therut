@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { brand, fonts, space, usePalette, useScheme } from '@/ui/theme';
+import { WeatherLine } from '@/ui/Weather';
 
 export default function Home() {
   const { userId } = useAuth();
@@ -82,6 +83,10 @@ export default function Home() {
                     <T variant="label" muted numberOfLines={1}>
                       {[course?.city, names].filter(Boolean).join(' · ')}
                     </T>
+                    <WeatherLine
+                      city={course?.city ?? course?.club_name}
+                      startsAt={m.starts_at ?? `${m.played_on}T10:00:00`}
+                    />
                   </View>
                 </Row>
               </Card>

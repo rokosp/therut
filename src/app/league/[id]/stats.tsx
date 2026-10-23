@@ -8,7 +8,7 @@ import { seasonAwards, type SeasonCard } from '@/lib/stats';
 import { useLoad } from '@/lib/useLoad';
 import { Fireworks } from '@/ui/Fireworks';
 import { PlayerLink } from '@/ui/PlayerLink';
-import { Avatar, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
+import { Avatar, Button, Card, ErrorText, Row, Screen, Section, T } from '@/ui/components';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 /** Season podium plus fun awards from every finished card in the league. */
@@ -137,7 +137,9 @@ export default function SeasonStats() {
             })}
           </Row>
         )}
-        {box && top.length && (league.finished_at || celebrate === '1') ? <Fireworks width={box.w} height={box.h} /> : null}
+        {box && top.length && (league.finished_at || celebrate === '1') ? (
+          <Fireworks width={box.w} height={box.h} />
+        ) : null}
       </View>
 
       {table.length > 3 ? (
@@ -152,6 +154,9 @@ export default function SeasonStats() {
         </View>
       ) : null}
 
+      {table.length ? (
+        <Button title="Share season recap" kind="secondary" onPress={() => router.push(`/league/${id}/recap`)} />
+      ) : null}
       {awards.length ? <Section title="Awards" /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s }}>
         {awards.map((a) => (
@@ -187,4 +192,3 @@ export default function SeasonStats() {
     </Screen>
   );
 }
-
