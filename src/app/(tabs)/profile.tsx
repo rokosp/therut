@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Avatar, Button, Card, ErrorText, Field, Row, Screen, Section, T, Segmented } from '@/ui/components';
 import { Friends } from '@/ui/Friends';
+import { BadgesBlock } from '@/ui/Badges';
 import { CareerHighlights, HcpCards, StatsRow } from '@/ui/PlayerBits';
 import { fonts, radius, space, usePalette, useThemePref } from '@/ui/theme';
 
@@ -126,6 +127,9 @@ export default function ProfileScreen() {
           { v: data?.stats.leagueWins ?? '–', l: 'Leagues\nwon' },
         ]}
       />
+      {data?.stats ? (
+        <BadgesBlock userId={userId!} mine ids={data.profile.showcase ?? []} achievements={data.stats.achievements} />
+      ) : null}
       {data?.stats ? <CareerHighlights career={data.stats.career} /> : null}
       <Button title="Stats & trends" kind="secondary" onPress={() => router.push(`/stats/${userId}`)} />
 

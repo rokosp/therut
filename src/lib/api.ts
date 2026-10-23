@@ -1,3 +1,4 @@
+import { computeAchievements, type AchRound } from './achievements';
 import { playedHoles, type CourseInfo, type TeeInfo } from './course';
 import { calculateHandicap, type HandicapResult, type HandicapRound } from './handicap';
 import { scoreMatch, type PlayerResult } from './scoring';
@@ -19,6 +20,8 @@ export interface Profile {
   is_guest?: boolean;
   /** Public URL of the profile photo, if they added one. */
   avatar_url?: string | null;
+  /** Achievement ids picked to show off on the profile (up to 4). */
+  showcase?: string[] | null;
 }
 
 // app_handicap arrives with the friends migration; until that runs, fall back to the older columns.
@@ -139,6 +142,7 @@ export async function playerStats(userId: string) {
     leagues: 0,
     leagueWins: 0,
     career: careerHighlights([]),
+    achievements: computeAchievements({ rounds: [], leagueWins: 0 }),
   };
   const mine = check(await supabase.from('match_players').select('match_id').eq('user_id', userId)) as {
     match_id: string;
@@ -158,6 +162,7 @@ export async function playerStats(userId: string) {
   let wins = 0;
   const grosses: number[] = [];
   const careerRounds: CareerRound[] = [];
+  const achRounds: AchRound[] = [];
   for (const m of matches) {
     const mp = m.match_players.find((p) => p.user_id === userId);
     if (mp) {
@@ -172,6 +177,26 @@ export async function playerStats(userId: string) {
       });
     }
     const r = resultsFor(m, withDefaults(m.leagues?.settings), courses).find((x) => x.userId === userId);
+    if (mp) {
+      const { course, played } = holesFor(m, courses, mp.tee_id);
+      achRounds.push({
+        matchId: m.id,
+        playedOn: m.played_on,
+        teeHour: teeHourOf(m),
+        courseId: m.course_id,
+        courseHoles: course?.holes ?? null,
+        firstHole: m.nine === 'back' ? 10 : 1,
+        holes: played.holes,
+        holeScores: mp.hole_scores,
+        holePars: played.holePars,
+        gross: careerRounds[careerRounds.length - 1].gross,
+        par: played.par,
+        final: m.status === 'final',
+        won: m.status === 'final' && r?.position === 1 && !r.tied && m.match_players.length > 1,
+        solo: m.match_players.length === 1,
+        bonuses: m.bonus_awards.filter((b) => b.user_id === userId).length,
+      });
+    }
     if (!r || r.gross == null) continue;
     rounds += 1;
     if (m.holes === 18) grosses.push(r.gross);
@@ -191,7 +216,24 @@ export async function playerStats(userId: string) {
     );
     if (table.find((t) => t.userId === userId)?.rank === 1) leagueWins += 1;
   }
-  return { rounds, avg18, wins, leagues: leagueIds.length, leagueWins, career: careerHighlights(careerRounds) };
+  return {
+    rounds,
+    avg18,
+    wins,
+    leagues: leagueIds.length,
+    leagueWins,
+    career: careerHighlights(careerRounds),
+    achievements: computeAchievements({ rounds: achRounds, leagueWins }),
+  };
+}
+
+/** Local tee-off hour: the planned tee time, or when the match was started on the day itself. */
+function teeHourOf(m: MatchRow & { created_at?: string }): number | null {
+  if (m.starts_at) return new Date(m.starts_at).getHours();
+  if (!m.created_at) return null;
+  const d = new Date(m.created_at);
+  const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return local === m.played_on ? d.getHours() : null;
 }
 
 export async function updateProfile(id: string, patch: Partial<Omit<Profile, 'id'>>) {
