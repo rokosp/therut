@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
 import {
   addBonus,
@@ -21,6 +21,7 @@ import { buildCommentary, type CommentaryLine } from '@/lib/commentary';
 import { strokesPerHole } from '@/lib/handicap';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
+import { confirmAction } from '@/ui/confirm';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 export default function MatchScreen() {
@@ -103,18 +104,12 @@ export default function MatchScreen() {
   const tied = results.filter((r) => r.tied);
   const myResult = results.find((r) => r.userId === userId);
   const confirmDelete = () =>
-    Alert.alert('Delete match?', 'Scores and bonuses for this match are removed for good.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () =>
-          action.run(async () => {
-            await deleteMatch(match.id);
-            router.back();
-          }),
-      },
-    ]);
+    confirmAction('Delete match?', 'Scores and bonuses for this match are removed for good.', 'Delete', () =>
+      action.run(async () => {
+        await deleteMatch(match.id);
+        router.replace(`/league/${match.league_id}`);
+      }),
+    );
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>

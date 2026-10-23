@@ -1,12 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 
-import { displayName, getLeague, removeMember, setMemberRole, updateLeague } from '@/lib/api';
+import { deleteLeague, displayName, getLeague, removeMember, setMemberRole, updateLeague } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { BonusType, LeagueSettings } from '@/lib/types';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Field, Row, Screen, Segmented, T } from '@/ui/components';
+import { confirmAction } from '@/ui/confirm';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
 
 /** Numbers are edited as text so half-typed values like "0." don't fight the user. */
@@ -79,14 +80,26 @@ export default function LeagueSettingsScreen() {
         bonusTypes,
       };
       await updateLeague(id, { name: draft.name.trim(), season: draft.season.trim() || null, settings });
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace(`/league/${id}`);
     });
 
   const confirmRemove = (uid: string, name: string) =>
-    Alert.alert('Remove player?', `${name} leaves the league. Their past results stay in the table.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => memberAction.run(async () => (await removeMember(id, uid), reload())) },
-    ]);
+    confirmAction('Remove player?', `${name} leaves the league. Their past results stay in the table.`, 'Remove', () =>
+      memberAction.run(async () => (await removeMember(id, uid), reload())),
+    );
+
+  const confirmDeleteLeague = () =>
+    confirmAction(
+      `Delete ${data.league.name}?`,
+      'This removes the league, all its matches, scores and bonuses for everyone. It cannot be undone.',
+      'Delete league',
+      () =>
+        memberAction.run(async () => {
+          await deleteLeague(id);
+          router.replace('/');
+        }),
+    );
 
   return (
     <Screen>
@@ -271,6 +284,14 @@ export default function LeagueSettingsScreen() {
             ) : null}
           </Row>
         ))}
+      </Card>
+
+      <Card>
+        <T variant="title">Delete league</T>
+        <T variant="label" muted>
+          Removes the league and every match in it for all players.
+        </T>
+        <Button title="Delete league" kind="danger" onPress={confirmDeleteLeague} busy={memberAction.busy} />
       </Card>
     </Screen>
   );

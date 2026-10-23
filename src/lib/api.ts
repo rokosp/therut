@@ -160,6 +160,10 @@ export async function updateLeague(id: string, patch: Partial<Pick<League, 'name
   check(await supabase.from('leagues').update(patch).eq('id', id));
 }
 
+export async function deleteLeague(id: string) {
+  check(await supabase.from('leagues').delete().eq('id', id));
+}
+
 export async function removeMember(leagueId: string, userId: string) {
   check(await supabase.from('league_members').delete().eq('league_id', leagueId).eq('user_id', userId));
 }

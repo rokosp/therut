@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -141,18 +141,39 @@ export function Section({ title, right }: { title: string; right?: ReactNode }) 
   );
 }
 
-export function Field({ label, hint, ...props }: TextInputProps & { label: string; hint?: string }) {
+export function Field({ label, hint, secureTextEntry, ...props }: TextInputProps & { label: string; hint?: string }) {
   const c = usePalette();
+  const [show, setShow] = useState(false);
   return (
     <View style={{ gap: space.xs }}>
       <T variant="eyebrow" muted>
         {label}
       </T>
-      <TextInput
-        placeholderTextColor={c.muted}
-        style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.bg }]}
-        {...props}
-      />
+      <View>
+        <TextInput
+          placeholderTextColor={c.muted}
+          secureTextEntry={secureTextEntry && !show}
+          style={[
+            styles.input,
+            { color: c.text, borderColor: c.border, backgroundColor: c.bg },
+            secureTextEntry && { paddingRight: 64 },
+          ]}
+          {...props}
+        />
+        {secureTextEntry ? (
+          // Password fields get a Show / Hide toggle.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={show ? 'Hide password' : 'Show password'}
+            onPress={() => setShow(!show)}
+            hitSlop={8}
+            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: space.m }}>
+            <T variant="eyebrow" style={{ color: c.accentText, fontSize: 11 }}>
+              {show ? 'Hide' : 'Show'}
+            </T>
+          </Pressable>
+        ) : null}
+      </View>
       {hint ? (
         <T variant="label" muted>
           {hint}
