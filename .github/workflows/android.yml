@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: android-apk
-  cancel-in-progress: true
+  # Let a running build finish; only the newest waiting build is kept.
+  cancel-in-progress: false
 
 jobs:
   build:

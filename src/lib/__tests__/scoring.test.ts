@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { scoreMatch, type MatchPlayerInput } from '../scoring';
 import { buildStandings } from '../standings';
-import { DEFAULT_SETTINGS, type LeagueSettings } from '../types';
+import { DEFAULT_SETTINGS, withDefaults, type LeagueSettings } from '../types';
 
 const gross: LeagueSettings = { ...DEFAULT_SETTINGS, scoring: 'gross' };
 const p = (userId: string, total: number, extra: Partial<MatchPlayerInput> = {}): MatchPlayerInput => ({
@@ -18,15 +18,21 @@ describe('scoreMatch', () => {
     ]);
   });
 
-  it('applies the minor multiplier', () => {
+  it('uses the minor points list for a minor', () => {
     const r = scoreMatch({ kind: 'minor', holes: 9 }, [p('a', 40), p('b', 38)], gross);
     expect(r.map((x) => x.placePoints)).toEqual([50, 35]);
   });
 
   it('uses custom league points', () => {
-    const s = { ...gross, placePoints: [10, 5], minorMultiplier: 0.25 };
+    const s = { ...gross, minorPoints: [10, 5] };
     const r = scoreMatch({ kind: 'minor', holes: 9 }, [p('a', 40), p('b', 38), p('c', 45)], s);
-    expect(r.map((x) => x.placePoints)).toEqual([2.5, 1.3, 0]);
+    expect(r.map((x) => [x.userId, x.placePoints])).toEqual([['b', 10], ['a', 5], ['c', 0]]);
+  });
+
+  it('turns an older single list with multipliers into two lists', () => {
+    const s = withDefaults({ placePoints: [100, 60], minorMultiplier: 0.5 } as never);
+    expect([s.majorPoints, s.minorPoints]).toEqual([[100, 60], [50, 30]]);
+    expect(withDefaults({ majorPoints: [9], minorPoints: [3] }).minorPoints).toEqual([3]);
   });
 
   it('ranks on net when the league uses net scoring', () => {

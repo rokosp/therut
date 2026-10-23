@@ -11,10 +11,10 @@ export interface BonusType {
 
 /** Everything a league admin can change. Stored as JSON on the league row. */
 export interface LeagueSettings {
-  /** Points for 1st, 2nd, 3rd... Places past the end of the list get 0. */
-  placePoints: number[];
-  majorMultiplier: number;
-  minorMultiplier: number;
+  /** Points for 1st, 2nd, 3rd... in a major (18 holes). Places past the end of the list get 0. */
+  majorPoints: number[];
+  /** Points for 1st, 2nd, 3rd... in a minor (9 holes). */
+  minorPoints: number[];
   /** Rank each match on gross strokes or on net (gross minus course handicap). */
   scoring: ScoringBasis;
   /** Which handicap is used for net scoring: the app's calculated one or the player's own. */
@@ -25,9 +25,8 @@ export interface LeagueSettings {
 }
 
 export const DEFAULT_SETTINGS: LeagueSettings = {
-  placePoints: [100, 70, 50, 35, 25, 15],
-  majorMultiplier: 1,
-  minorMultiplier: 0.5,
+  majorPoints: [100, 70, 50, 35, 25, 15],
+  minorPoints: [50, 35, 25, 18, 12, 8],
   scoring: 'net',
   handicapSource: 'app',
   tiebreak: 'countback',
@@ -41,5 +40,21 @@ export const DEFAULT_SETTINGS: LeagueSettings = {
 
 /** Fill any missing fields with defaults, so older leagues keep working when new settings are added. */
 export function withDefaults(s: Partial<LeagueSettings> | null | undefined): LeagueSettings {
-  return { ...DEFAULT_SETTINGS, ...(s ?? {}) };
+  const saved = (s ?? {}) as Partial<LeagueSettings> & {
+    placePoints?: number[];
+    majorMultiplier?: number;
+    minorMultiplier?: number;
+  };
+  const out = { ...DEFAULT_SETTINGS, ...saved };
+  // Leagues saved before separate major/minor lists had one list plus multipliers.
+  if (saved.placePoints && !saved.majorPoints) {
+    out.majorPoints = saved.placePoints.map((p) => Math.round(p * (saved.majorMultiplier ?? 1) * 10) / 10);
+  }
+  if (saved.placePoints && !saved.minorPoints) {
+    out.minorPoints = saved.placePoints.map((p) => Math.round(p * (saved.minorMultiplier ?? 0.5) * 10) / 10);
+  }
+  delete (out as { placePoints?: unknown }).placePoints;
+  delete (out as { majorMultiplier?: unknown }).majorMultiplier;
+  delete (out as { minorMultiplier?: unknown }).minorMultiplier;
+  return out;
 }

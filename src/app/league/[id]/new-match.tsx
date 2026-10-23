@@ -116,7 +116,7 @@ export default function NewMatch() {
           onChange={setKind}
         />
         <T variant="label" muted>
-          {kind === 'major' ? 'Full points' : `Points × ${settings.minorMultiplier}`}
+          Points for 1st: {(kind === 'major' ? settings.majorPoints : settings.minorPoints)[0] ?? 0}
         </T>
         <Field label="Date played" value={playedOn} onChangeText={setPlayedOn} placeholder="YYYY-MM-DD" />
       </Card>

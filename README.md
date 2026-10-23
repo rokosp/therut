@@ -12,11 +12,11 @@ Golf league score tracker for a small crew. Android first (Expo / React Native),
 - Tie breakers inside a match: countback, playoff, or split points.
 - App handicap (simplified WHS), shown next to the handicap a player enters themselves.
 
-Every rule is per league, under League settings: points per place, major/minor multipliers, gross or net, app or own handicap for net, tie breaker, and bonus types.
+Every rule is per league, under League settings: major and minor points per place, gross or net, app or own handicap for net, tie breaker, and bonus types.
 
 ## Rules in detail
 
-**Points.** Places 1, 2, 3... earn the league's `placePoints` (default 100, 70, 50, 35, 25, 15, then 0) times the multiplier (major 1, minor 0.5 by default). Bonus points are added on top and aren't multiplied. Only finished matches count toward the table. Changing settings re-scores past matches.
+**Points.** Each league has two editable lists: points per finishing place for majors (default 100, 70, 50, 35, 25, 15) and for minors (default 50, 35, 25, 18, 12, 8). Places past the end of a list get 0. Bonus points are added on top. Only finished matches count toward the table. Changing settings re-scores past matches.
 
 **Tie breakers (one match).** If players are level on the score the match is ranked on:
 - Countback: best last 9, then last 6, last 3, last hole (last 6/3/1 for 9 holes). Net countback takes off 1/2, 1/3, 1/6, 1/18 of the handicap. Needs hole-by-hole scores, otherwise points are split.

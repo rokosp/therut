@@ -301,11 +301,6 @@ export default function MatchScreen() {
           Tie: {[...new Set(results.map((r) => r.tiebreakNote).filter(Boolean))].join(', ')}
         </T>
       ) : null}
-      {match.kind === 'minor' ? (
-        <T variant="label" muted>
-          Minor match: points × {settings.minorMultiplier}.
-        </T>
-      ) : null}
 
       {settings.tiebreak === 'playoff' && editable && (tied.length > 0 || match.match_players.some((p) => p.playoff_rank != null)) ? (
         <Card>

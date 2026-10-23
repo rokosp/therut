@@ -14,9 +14,8 @@ import { fonts, radius, space, usePalette } from '@/ui/theme';
 type Draft = {
   name: string;
   season: string;
-  placePoints: string[];
-  majorMultiplier: string;
-  minorMultiplier: string;
+  majorPoints: string[];
+  minorPoints: string[];
   scoring: LeagueSettings['scoring'];
   handicapSource: LeagueSettings['handicapSource'];
   tiebreak: LeagueSettings['tiebreak'];
@@ -39,9 +38,8 @@ export default function LeagueSettingsScreen() {
     setDraft({
       name: b.league.name,
       season: b.league.season ?? '',
-      placePoints: s.placePoints.map(String),
-      majorMultiplier: String(s.majorMultiplier),
-      minorMultiplier: String(s.minorMultiplier),
+      majorPoints: s.majorPoints.map(String),
+      minorPoints: s.minorPoints.map(String),
       scoring: s.scoring,
       handicapSource: s.handicapSource,
       tiebreak: s.tiebreak,
@@ -63,17 +61,17 @@ export default function LeagueSettingsScreen() {
 
   const onSave = () =>
     save.run(async () => {
-      const placePoints = draft.placePoints.map(num);
+      const majorPoints = draft.majorPoints.map(num);
+      const minorPoints = draft.minorPoints.map(num);
       const bonusTypes: BonusType[] = draft.bonusTypes
         .filter((b) => b.label.trim())
         .map((b) => ({ key: b.key, label: b.label.trim(), points: num(b.points) }));
-      const all = [...placePoints, num(draft.majorMultiplier), num(draft.minorMultiplier), ...bonusTypes.map((b) => b.points)];
+      const all = [...majorPoints, ...minorPoints, ...bonusTypes.map((b) => b.points)];
       if (all.some((n) => Number.isNaN(n))) throw new Error('Some points are not numbers.');
       if (!draft.name.trim()) throw new Error('The league needs a name.');
       const settings: LeagueSettings = {
-        placePoints,
-        majorMultiplier: num(draft.majorMultiplier),
-        minorMultiplier: num(draft.minorMultiplier),
+        majorPoints,
+        minorPoints,
         scoring: draft.scoring,
         handicapSource: draft.handicapSource,
         tiebreak: draft.tiebreak,
@@ -109,58 +107,16 @@ export default function LeagueSettingsScreen() {
         <Field label="Season" value={draft.season} onChangeText={(v) => set({ season: v })} />
       </Card>
 
-      <Card>
-        <T variant="title">Points per finishing place</T>
-        <T variant="label" muted>
-          Full points for a major. Places past the end of the list get 0.
-        </T>
-        {draft.placePoints.map((p, i) => (
-          <Row key={i}>
-            <T variant="mono" style={{ width: 44 }}>
-              {ordinal(i + 1)}
-            </T>
-            <TextInput
-              value={p}
-              keyboardType="decimal-pad"
-              onChangeText={(v) => set({ placePoints: draft.placePoints.map((x, j) => (j === i ? v : x)) })}
-              style={[styles.num, input]}
-            />
-          </Row>
-        ))}
-        <Row>
-          <Button
-            title="Add place"
-            kind="secondary"
-            style={{ flex: 1 }}
-            onPress={() => set({ placePoints: [...draft.placePoints, '0'] })}
-          />
-          <Button
-            title="Remove last"
-            kind="secondary"
-            style={{ flex: 1 }}
-            disabled={draft.placePoints.length <= 1}
-            onPress={() => set({ placePoints: draft.placePoints.slice(0, -1) })}
-          />
-        </Row>
-        <Row style={{ alignItems: 'flex-start' }}>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="Major (18) multiplier"
-              value={draft.majorMultiplier}
-              onChangeText={(v) => set({ majorMultiplier: v })}
-              keyboardType="decimal-pad"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Field
-              label="Minor (9) multiplier"
-              value={draft.minorMultiplier}
-              onChangeText={(v) => set({ minorMultiplier: v })}
-              keyboardType="decimal-pad"
-            />
-          </View>
-        </Row>
-      </Card>
+      <PointsEditor
+        title="Major points · 18 holes"
+        values={draft.majorPoints}
+        onChange={(v) => set({ majorPoints: v })}
+      />
+      <PointsEditor
+        title="Minor points · 9 holes"
+        values={draft.minorPoints}
+        onChange={(v) => set({ minorPoints: v })}
+      />
 
       <Card>
         <T variant="title">Scoring</T>
@@ -294,6 +250,50 @@ export default function LeagueSettingsScreen() {
         <Button title="Delete league" kind="danger" onPress={confirmDeleteLeague} busy={memberAction.busy} />
       </Card>
     </Screen>
+  );
+}
+
+function PointsEditor({
+  title,
+  values,
+  onChange,
+}: {
+  title: string;
+  values: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const c = usePalette();
+  return (
+    <Card>
+      <T variant="title">{title}</T>
+      <T variant="label" muted>
+        Points for each finishing place. Places past the end of the list get 0.
+      </T>
+      {values.map((p, i) => (
+        <Row key={i}>
+          <T variant="mono" style={{ width: 44 }}>
+            {ordinal(i + 1)}
+          </T>
+          <TextInput
+            value={p}
+            keyboardType="decimal-pad"
+            onChangeText={(v) => onChange(values.map((x, j) => (j === i ? v : x)))}
+            style={[styles.num, { color: c.text, borderColor: c.border, backgroundColor: c.bg }]}
+          />
+        </Row>
+      ))}
+      <Row>
+        <Button title="Add place" kind="secondary" compact style={{ flex: 1 }} onPress={() => onChange([...values, '0'])} />
+        <Button
+          title="Remove last"
+          kind="secondary"
+          compact
+          style={{ flex: 1 }}
+          disabled={values.length <= 1}
+          onPress={() => onChange(values.slice(0, -1))}
+        />
+      </Row>
+    </Card>
   );
 }
 

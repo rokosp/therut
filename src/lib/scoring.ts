@@ -106,8 +106,8 @@ function groupBy<T>(items: T[], cmp: (a: T, b: T) => number): T[][] {
   return out;
 }
 
-export function multiplierFor(kind: MatchKind, settings: LeagueSettings): number {
-  return kind === 'major' ? settings.majorMultiplier : settings.minorMultiplier;
+export function pointsFor(kind: MatchKind, settings: LeagueSettings): number[] {
+  return kind === 'major' ? settings.majorPoints : settings.minorPoints;
 }
 
 export function scoreMatch(
@@ -117,7 +117,7 @@ export function scoreMatch(
   bonuses: BonusInput[] = [],
 ): PlayerResult[] {
   const net = settings.scoring === 'net';
-  const mult = multiplierFor(match.kind, settings);
+  const table = pointsFor(match.kind, settings);
   const bonusBy = new Map<string, number>();
   for (const b of bonuses) bonusBy.set(b.userId, (bonusBy.get(b.userId) ?? 0) + b.points);
 
@@ -136,8 +136,8 @@ export function scoreMatch(
     const { groups, note } =
       group.length > 1 ? breakTie(group, match, settings) : { groups: [[group[0].p]], note: '' };
     for (const sub of groups) {
-      const slots = sub.map((_, i) => settings.placePoints[place - 1 + i] ?? 0);
-      const each = round1((slots.reduce((a, b) => a + b, 0) / sub.length) * mult);
+      const slots = sub.map((_, i) => table[place - 1 + i] ?? 0);
+      const each = round1(slots.reduce((a, b) => a + b, 0) / sub.length);
       for (const p of sub) {
         const s = scored.find((x) => x.p === p)!;
         const bonus = bonusBy.get(p.userId) ?? 0;
