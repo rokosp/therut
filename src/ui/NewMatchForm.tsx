@@ -13,14 +13,17 @@ import {
   type Member,
   holesFor,
   listCourses,
+  playedCourseCounts,
   searchCoursesOnline,
   playingIndex,
   teeLabel,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { rankCourses } from '@/lib/courseSearch';
 import { courseHandicap } from '@/lib/handicap';
 import { withDefaults, type MatchFormat, type MatchKind } from '@/lib/types';
 import { useAction, useLoad } from '@/lib/useLoad';
+import { AddCourseModal } from '@/ui/AddCourse';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Segmented, T } from '@/ui/components';
 import { MonthGrid } from '@/ui/MonthGrid';
 import { brand, fonts, radius, space, usePalette } from '@/ui/theme';
@@ -63,29 +66,42 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   const [query, setQuery] = useState('');
   const [onlineNote, setOnlineNote] = useState<string | null>(null);
   const [solo, setSolo] = useState(false);
+  const [adding, setAdding] = useState(false);
+  // A course just added by hand: pick it once the list reloads.
+  const [justAdded, setJustAdded] = useState<string | null>(null);
   const online = useAction();
   const {
     data,
     error: loadError,
     reload,
   } = useLoad(async () => {
-    const [bundle, courses] = await Promise.all([
+    const [bundle, courses, played] = await Promise.all([
       leagueId ? getLeague(leagueId) : casualBundle(userId!),
       listCourses(),
+      playedCourseCounts(userId!).catch(() => ({}) as Record<string, number>),
     ]);
     const hcps = await handicapsFor(
       bundle.members.map((m) => m.user_id),
       courses,
     );
-    return { ...bundle, courses, hcps };
+    return { ...bundle, courses, hcps, played };
   }, [leagueId, userId]);
 
-  // Sensible first choices: first course, its first tee, and me in the match.
+  // Sensible first choices: the course I play most, its first tee, and me in the match.
   useEffect(() => {
     if (!data) return;
-    if (!courseId && data.courses[0]) {
-      setCourseId(data.courses[0].id);
-      setTeeId(teesOf(data.courses[0])[0]?.id ?? null);
+    const added = justAdded ? data.courses.find((x) => x.id === justAdded) : null;
+    if (added) {
+      setJustAdded(null);
+      setCourseId(added.id);
+      setTeeId(teesOf(added)[0]?.id ?? null);
+      setQuery('');
+    } else if (!courseId) {
+      const first = rankCourses(data.courses, '', data.played, 1)[0];
+      if (first) {
+        setCourseId(first.id);
+        setTeeId(teesOf(first)[0]?.id ?? null);
+      }
     }
     if (userId && Object.keys(players).length === 0) setPlayers({ [userId]: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,18 +115,15 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
     );
   }
 
-  const { courses, members, settings, hcps } = data;
+  const { courses, members, settings, hcps, played } = data;
   // A date after today means planning ahead rather than playing now.
   const later = /^\d{4}-\d{2}-\d{2}$/.test(playedOn) && playedOn > today();
   const course = courses.find((c) => c.id === courseId) ?? null;
   const q = query.trim().toLowerCase();
-  const matching = q
-    ? courses.filter((c) =>
-        [c.name, c.club_name, c.city ?? '', c.country ?? ''].some((x) => x.toLowerCase().includes(q)),
-      )
-    : courses;
-  // Keep the picked course visible, then the matches (a handful when nothing is typed).
-  const shownCourses = [...(course ? [course] : []), ...matching.filter((c) => c.id !== courseId).slice(0, q ? 12 : 5)];
+  // While typing: the top 4 saved courses (ones I've played first). Otherwise just the picked course.
+  const matching = rankCourses(courses, q, played, 4);
+  const shownCourses = q ? matching : course ? [course] : matching;
+  const noLocalMatch = !!q && matching.length === 0;
   const holes: 9 | 18 = kind === 'major' ? 18 : 9;
   const matchShape = {
     holes,
@@ -127,9 +140,25 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
     return { ch: courseHandicap(idx, played), idx };
   };
 
+  // Ask GolfCourseAPI (uses the daily allowance), then show what it saved.
+  const searchOnline = () =>
+    online.run(async () => {
+      const r = await searchCoursesOnline(query);
+      await reload();
+      setOnlineNote(
+        r.source === 'saved'
+          ? 'Already searched recently, so the results are in the list above.'
+          : r.found
+            ? `Found ${r.found} course${r.found === 1 ? '' : 's'} online. They're saved now.`
+            : 'Nothing found online. The search only knows course and club names, so try the club or town (like "Mokrice") instead of a country.',
+      );
+    });
+
   const pickCourse = (cid: string) => {
     const c = courses.find((x) => x.id === cid);
     setCourseId(cid);
+    setQuery('');
+    setOnlineNote(null);
     setTeeId((c ? teesOf(c)[0]?.id : null) ?? null);
     // Player tee choices belong to the old course.
     setPlayers(Object.fromEntries(Object.keys(players).map((k) => [k, null])));
@@ -301,7 +330,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
             setQuery(v);
             setOnlineNote(null);
           }}
-          placeholder="Course, club or city"
+          placeholder={course ? 'Type to pick a different course' : 'Course, club or city'}
         />
         <Row style={{ flexWrap: 'wrap' }}>
           {shownCourses.map((c) => (
@@ -313,27 +342,35 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
             />
           ))}
         </Row>
-        {query.trim() && shownCourses.length === (course ? 1 : 0) ? <T muted>No saved course matches that.</T> : null}
+        {noLocalMatch ? <T muted>None of the saved courses match that.</T> : null}
+        {/* Saved courses first; the online search (which uses the daily allowance) only after that. */}
         {query.trim().length >= 3 ? (
-          <Button
-            title={`Search online for "${query.trim()}"`}
-            kind="secondary"
-            busy={online.busy}
-            onPress={() =>
-              online.run(async () => {
-                const r = await searchCoursesOnline(query);
-                await reload();
-                setOnlineNote(
-                  r.source === 'saved'
-                    ? 'Already searched recently, so the results are in the list above.'
-                    : r.found
-                      ? `Found ${r.found} course${r.found === 1 ? '' : 's'} online. They're saved now.`
-                      : 'Nothing found online. The search only knows course and club names, so try the club or town (like "Mokrice") instead of a country.',
-                );
-              })
-            }
-          />
+          noLocalMatch ? (
+            <Button
+              title={`Search online for "${query.trim()}"`}
+              kind="secondary"
+              busy={online.busy}
+              onPress={searchOnline}
+            />
+          ) : (
+            <Pressable accessibilityRole="button" hitSlop={8} disabled={online.busy} onPress={searchOnline}>
+              <T variant="label" style={{ color: c.accentText }}>
+                Not listed? Search online for "{query.trim()}"
+              </T>
+            </Pressable>
+          )
         ) : null}
+        {noLocalMatch ? <Button title="Add a course" kind="secondary" onPress={() => setAdding(true)} /> : null}
+        <AddCourseModal
+          visible={adding}
+          initialName={query.trim()}
+          onClose={() => setAdding(false)}
+          onSaved={(id) => {
+            setAdding(false);
+            setJustAdded(id);
+            reload();
+          }}
+        />
         <ErrorText error={online.error} />
         {onlineNote ? (
           <T variant="label" muted>

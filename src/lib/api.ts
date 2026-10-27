@@ -45,6 +45,8 @@ export interface Tee extends TeeInfo {
   sort_order: number;
   /** An old layout kept for past matches; not offered for new ones. */
   retired?: boolean;
+  /** Hole distances in metres, when someone entered them. */
+  hole_lengths?: number[] | null;
 }
 
 export interface Course extends CourseInfo {
@@ -370,6 +372,39 @@ export async function listCourses(): Promise<Course[]> {
 /** Look a course up on GolfCourseAPI (through Supabase, which holds the key) and save what it finds. */
 export async function searchCoursesOnline(q: string): Promise<{ source: 'api' | 'saved'; found: number }> {
   return check(await supabase.rpc('search_courses_online', { q }));
+}
+
+export interface NewCourse {
+  name: string;
+  city: string;
+  country: string;
+  holes: 9 | 18;
+  pars: number[];
+  stroke_index?: number[];
+  tees?: { name: string; course_rating?: string; slope?: string; lengths?: (number | null)[] }[];
+}
+
+/** Save a course typed in by hand. Returns its id. */
+export async function addCourse(c: NewCourse): Promise<string> {
+  try {
+    return check(await supabase.rpc('add_course', { c }));
+  } catch (e) {
+    if (String(e).includes('add_course')) throw new Error('Run the "add a course" database update in Supabase first.');
+    throw e;
+  }
+}
+
+/** How many matches a player has played on each course, by course id. */
+export async function playedCourseCounts(userId: string): Promise<Record<string, number>> {
+  const rows = check(
+    await supabase.from('match_players').select('matches!inner(course_id)').eq('user_id', userId),
+  ) as unknown as { matches: { course_id: string | null } | null }[];
+  const out: Record<string, number> = {};
+  for (const r of rows) {
+    const id = r.matches?.course_id;
+    if (id) out[id] = (out[id] ?? 0) + 1;
+  }
+  return out;
 }
 
 export function teeLabel(t: Tee): string {
