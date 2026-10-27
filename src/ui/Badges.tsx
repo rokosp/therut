@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { MAX_SHOWCASE, type AchGroup, type Achievement } from '@/lib/achievements';
@@ -80,28 +81,57 @@ export function Badge({
   );
 }
 
-/** The (up to 4) badges a player picked to show off. */
-export function Showcase({
-  ids,
-  achievements,
-  onPress,
-}: {
-  ids: string[];
-  achievements: Achievement[];
-  onPress?: () => void;
-}) {
+/** The (up to 4) badges a player picked to show off. Tapping one says what it's for. */
+export function Showcase({ ids, achievements }: { ids: string[]; achievements: Achievement[] }) {
+  const c = usePalette();
+  const [open, setOpen] = useState<Achievement | null>(null);
   const picked = ids
     .map((id) => achievements.find((a) => a.id === id))
     .filter((a): a is Achievement => !!a && a.earned);
   if (picked.length === 0) return null;
   return (
-    <Pressable onPress={onPress} disabled={!onPress}>
+    <>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.xs }}>
         {picked.map((a) => (
-          <Badge key={a.id} a={a} size={56} />
+          <Badge key={a.id} a={a} size={56} onPress={() => setOpen(a)} />
         ))}
       </View>
-    </Pressable>
+      <Modal visible={!!open} transparent animationType="fade" onRequestClose={() => setOpen(null)}>
+        <Pressable
+          onPress={() => setOpen(null)}
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: space.xl,
+            backgroundColor: 'rgba(11,42,31,0.55)',
+          }}>
+          {open ? (
+            <View
+              style={{
+                width: '100%',
+                maxWidth: 320,
+                backgroundColor: c.bg,
+                borderRadius: 16,
+                padding: space.l,
+                alignItems: 'center',
+                gap: space.s,
+              }}>
+              <Badge a={open} size={64} showName={false} />
+              <T variant="title" style={{ textAlign: 'center' }}>
+                {open.name}
+              </T>
+              <T muted style={{ textAlign: 'center' }}>
+                {open.desc}
+              </T>
+              <T variant="label" muted>
+                Tap anywhere to close
+              </T>
+            </View>
+          ) : null}
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -131,7 +161,7 @@ export function BadgesBlock({
         }
       />
       {shown.length ? (
-        <Showcase ids={shown} achievements={achievements} onPress={open} />
+        <Showcase ids={shown} achievements={achievements} />
       ) : (
         <T muted>
           {mine
