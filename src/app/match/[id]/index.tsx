@@ -217,6 +217,9 @@ export default function MatchScreen() {
             }
           />
         ) : null}
+        {canManage ? (
+          <Button title="Edit match" kind="secondary" onPress={() => router.push(`/match/${match.id}/edit`)} />
+        ) : null}
         {canManage ? <Button title="Cancel match" kind="danger" onPress={confirmDelete} /> : null}
       </Screen>
     );

@@ -15,6 +15,8 @@ import {
   listCourses,
   playedCourseCounts,
   searchCoursesOnline,
+  updateScheduledMatch,
+  type MatchRow,
   playingIndex,
   teeLabel,
 } from '@/lib/api';
@@ -48,19 +50,32 @@ const today = () => {
 };
 
 /** Set up a match: in a league (leagueId), or a casual round with friends (leagueId null). */
-export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+/** Set up a match, or change a scheduled one (edit) before it starts. */
+export function NewMatchForm({ leagueId, edit }: { leagueId: string | null; edit?: MatchRow }) {
   const { userId } = useAuth();
-  const [playedOn, setPlayedOn] = useState(today());
-  const [teeTime, setTeeTime] = useState('09:00');
+  const [playedOn, setPlayedOn] = useState(edit?.played_on ?? today());
+  const [teeTime, setTeeTime] = useState(edit?.starts_at ? hhmm(edit.starts_at) : '09:00');
   const [pickingDate, setPickingDate] = useState(false);
   const [gridMonth, setGridMonth] = useState<string | null>(null);
   const c = usePalette();
-  const [courseId, setCourseId] = useState<string | null>(null);
-  const [teeId, setTeeId] = useState<string | null>(null);
-  const [kind, setKind] = useState<MatchKind>('major');
-  const [format, setFormat] = useState<MatchFormat | null>(null); // null = league default
-  const [nine, setNine] = useState<'front' | 'back'>('front');
-  const [players, setPlayers] = useState<Record<string, string | null>>({}); // userId -> own tee (null = match tee)
+  const [courseId, setCourseId] = useState<string | null>(edit?.course_id ?? null);
+  const [teeId, setTeeId] = useState<string | null>(edit?.tee_id ?? null);
+  const [kind, setKind] = useState<MatchKind>(edit?.kind ?? 'major');
+  const [format, setFormat] = useState<MatchFormat | null>(edit?.format ?? null); // null = league default
+  const [nine, setNine] = useState<'front' | 'back'>(edit?.nine ?? 'front');
+  // userId -> own tee (null = match tee)
+  const [players, setPlayers] = useState<Record<string, string | null>>(
+    edit
+      ? Object.fromEntries(
+          edit.match_players.map((p) => [p.user_id, p.tee_id && p.tee_id !== edit.tee_id ? p.tee_id : null]),
+        )
+      : {},
+  );
   const { busy, error, run } = useAction();
 
   const [query, setQuery] = useState('');
@@ -117,7 +132,8 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
 
   const { courses, members, settings, hcps, played } = data;
   // A date after today means planning ahead rather than playing now.
-  const later = /^\d{4}-\d{2}-\d{2}$/.test(playedOn) && playedOn > today();
+  // Editing keeps the match scheduled, so the tee time stays on screen.
+  const later = !!edit || (/^\d{4}-\d{2}-\d{2}$/.test(playedOn) && playedOn > today());
   const course = courses.find((c) => c.id === courseId) ?? null;
   const q = query.trim().toLowerCase();
   // While typing: the top 4 saved courses (ones I've played first). Otherwise just the picked course.
@@ -178,6 +194,21 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
       const ids = Object.keys(players);
       if (leagueId && ids.length < 2) throw new Error('Pick at least two players.');
       if (ids.length < 1) throw new Error('Pick at least one player.');
+      if (edit) {
+        await updateScheduledMatch(edit, {
+          courseId,
+          teeId,
+          playedOn,
+          startsAt: new Date(`${playedOn}T${teeTime.trim().padStart(5, '0')}:00`).toISOString(),
+          kind,
+          format: format ?? settings.defaultFormat,
+          holes,
+          nine: matchShape.nine,
+          players: ids.map((uid) => ({ userId: uid, teeId: players[uid] ?? teeId, courseHandicap: chFor(uid).ch })),
+        });
+        router.back();
+        return;
+      }
       const matchId = await createMatch({
         leagueId,
         courseId,
@@ -314,8 +345,9 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
               />
             </Row>
             <T variant="label" muted>
-              This is a future date, so the match is scheduled. The players get an invite and it shows under Upcoming on
-              their home page. Anyone in it can start it on the day.
+              {edit
+                ? 'Anyone you add gets an invite. Anyone in it can start it on the day.'
+                : 'This is a future date, so the match is scheduled. The players get an invite and it shows under Upcoming on their home page. Anyone in it can start it on the day.'}
             </T>
           </>
         ) : null}
@@ -457,7 +489,12 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
       })}
 
       <ErrorText error={error} />
-      <Button title={later ? 'Schedule match' : 'Start match'} kind="accent" onPress={create} busy={busy} />
+      <Button
+        title={edit ? 'Save changes' : later ? 'Schedule match' : 'Start match'}
+        kind="accent"
+        onPress={create}
+        busy={busy}
+      />
     </Screen>
   );
 }

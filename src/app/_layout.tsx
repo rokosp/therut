@@ -66,6 +66,7 @@ function RootStack() {
           <Stack.Screen name="match/new" options={{ title: 'New match' }} />
           <Stack.Screen name="match/join" options={{ title: 'Join match', presentation: 'modal' }} />
           <Stack.Screen name="match/[id]/index" options={{ title: 'Match' }} />
+          <Stack.Screen name="match/[id]/edit" options={{ title: 'Edit match' }} />
           <Stack.Screen name="league/[id]/stats" options={{ title: 'Season stats' }} />
           <Stack.Screen name="league/[id]/recap" options={{ title: 'Season recap' }} />
           <Stack.Screen name="player/[id]" options={{ title: 'Player' }} />

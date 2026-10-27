@@ -527,6 +527,60 @@ export async function createMatch(input: {
   return match.id;
 }
 
+/** Change a scheduled match before it starts: its details and who's playing. */
+export async function updateScheduledMatch(
+  match: MatchRow,
+  input: Omit<Parameters<typeof createMatch>[0], 'leagueId'> & { startsAt: string },
+): Promise<void> {
+  const row: Record<string, unknown> = {
+    course_id: input.courseId,
+    tee_id: input.teeId,
+    played_on: input.playedOn,
+    starts_at: input.startsAt,
+    kind: input.kind,
+    format: input.format,
+    holes: input.holes,
+    nine: input.nine,
+  };
+  const res = await supabase.from('matches').update(row).eq('id', match.id).eq('status', 'scheduled').select('id');
+  const updated = check(res) as { id: string }[];
+  if (!updated.length)
+    throw new Error(
+      'Only the person who set up the match (or a league admin) can change it, and only before it starts.',
+    );
+
+  const before = new Set(match.match_players.map((p) => p.user_id));
+  const after = new Set(input.players.map((p) => p.userId));
+  const gone = [...before].filter((id) => !after.has(id));
+  if (gone.length) check(await supabase.from('match_players').delete().eq('match_id', match.id).in('user_id', gone));
+  for (const p of input.players) {
+    if (before.has(p.userId)) {
+      check(
+        await supabase
+          .from('match_players')
+          .update({ tee_id: p.teeId, course_handicap: p.courseHandicap })
+          .eq('match_id', match.id)
+          .eq('user_id', p.userId),
+      );
+    }
+  }
+  const added = input.players.filter((p) => !before.has(p.userId));
+  if (added.length) {
+    check(
+      await supabase
+        .from('match_players')
+        .insert(
+          added.map((p) => ({
+            match_id: match.id,
+            user_id: p.userId,
+            tee_id: p.teeId,
+            course_handicap: p.courseHandicap,
+          })),
+        ),
+    );
+  }
+}
+
 export async function joinMatch(code: string): Promise<string> {
   return check(await supabase.rpc('join_match', { code }));
 }
