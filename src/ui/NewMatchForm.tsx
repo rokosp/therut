@@ -105,7 +105,9 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
   const course = courses.find((c) => c.id === courseId) ?? null;
   const q = query.trim().toLowerCase();
   const matching = q
-    ? courses.filter((c) => [c.name, c.club_name, c.city ?? ''].some((x) => x.toLowerCase().includes(q)))
+    ? courses.filter((c) =>
+        [c.name, c.club_name, c.city ?? '', c.country ?? ''].some((x) => x.toLowerCase().includes(q)),
+      )
     : courses;
   // Keep the picked course visible, then the matches (a handful when nothing is typed).
   const shownCourses = [...(course ? [course] : []), ...matching.filter((c) => c.id !== courseId).slice(0, q ? 12 : 5)];
@@ -326,7 +328,7 @@ export function NewMatchForm({ leagueId }: { leagueId: string | null }) {
                     ? 'Already searched recently, so the results are in the list above.'
                     : r.found
                       ? `Found ${r.found} course${r.found === 1 ? '' : 's'} online. They're saved now.`
-                      : 'Nothing found online. Try a shorter name, like the club or city.',
+                      : 'Nothing found online. The search only knows course and club names, so try the club or town (like "Mokrice") instead of a country.',
                 );
               })
             }
