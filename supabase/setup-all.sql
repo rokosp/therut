@@ -874,8 +874,18 @@ where mp.match_id = m.id and mp.tee_id is not null
 --   (the count comes from the hole list instead).
 -- * Only searches that found something are remembered for 30 days; empty ones can be retried.
 -- * Courses saved by an earlier search are kept as they are instead of being rebuilt.
+-- * Search results without hole data get their full details fetched (a few per search),
+--   and courses are saved even when the hole count is still missing (assumed 18).
+-- * The first result of each search is kept in the log, to help fix future problems.
 -- Also forget earlier empty searches so they can run again.
 delete from public.course_api_log where found = 0;
+alter table public.course_api_log add column if not exists sample jsonb;
+
+-- The tees of one gender as a JSON array, whatever the API sent.
+create or replace function public.gca_tees(c jsonb, g text) returns jsonb
+language sql immutable as $$
+  select case when jsonb_typeof(c -> 'tees' -> g) = 'array' then c -> 'tees' -> g else '[]'::jsonb end
+$$;
 
 create or replace function public.search_courses_online(q text) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
@@ -893,6 +903,8 @@ declare
   si int[];
   k int;
   found int := 0;
+  details int := 0;
+  d jsonb;
 begin
   if auth.uid() is null then raise exception 'Sign in first'; end if;
   if length(term) < 3 then raise exception 'Type at least 3 letters to search online'; end if;
@@ -928,13 +940,34 @@ begin
       found := found + 1;
       continue;
     end if;
+    -- Search results can be cut down. If no tee has hole data, ask for the full course
+    -- (only for the first few results, to save the daily allowance).
+    if not exists (select 1 from jsonb_array_elements(gca_tees(c, 'male') || gca_tees(c, 'female')) x
+                   where jsonb_typeof(x -> 'holes') = 'array' and jsonb_array_length(x -> 'holes') > 0)
+       and details < 3 and c ->> 'id' is not null then
+      details := details + 1;
+      begin
+        res := http((
+          'GET', 'https://api.golfcourseapi.com/v1/courses/' || urlencode(c ->> 'id'),
+          array[http_header('Authorization', 'Key ' || api_key)], null, null
+        )::http_request);
+        if res.status = 200 then
+          d := res.content::jsonb;
+          d := case when jsonb_typeof(d -> 'course') = 'object' then d -> 'course' else d end;
+          if jsonb_typeof(d -> 'tees') = 'object' then c := c || jsonb_build_object('tees', d -> 'tees'); end if;
+        end if;
+      exception when others then null;
+      end;
+    end if;
+
     -- Hole count and par come from the first tee listed. Some courses leave out the
-    -- hole count, so fall back to counting the holes.
-    t := coalesce(c -> 'tees' -> 'male' -> 0, c -> 'tees' -> 'female' -> 0);
-    continue when t is null;
-    n_holes := coalesce(nullif(t ->> 'number_of_holes', '')::numeric::int, jsonb_array_length(coalesce(t -> 'holes', '[]'::jsonb)));
-    if n_holes = 27 or n_holes = 36 then n_holes := 18; end if;
-    continue when n_holes is null or n_holes not in (9, 18);
+    -- hole count, so fall back to counting the holes, then to 18.
+    t := coalesce(gca_tees(c, 'male') -> 0, gca_tees(c, 'female') -> 0, '{}'::jsonb);
+    n_holes := coalesce(nullif(t ->> 'number_of_holes', '')::numeric::int,
+                        nullif(case when jsonb_typeof(t -> 'holes') = 'array' then jsonb_array_length(t -> 'holes') end, 0),
+                        18);
+    if n_holes > 18 then n_holes := 18; end if;
+    if n_holes not in (9, 18) then n_holes := case when n_holes < 9 then 9 else 18 end; end if;
 
     insert into courses (slug, external_id, club_name, name, city, country, holes, par)
     values (
@@ -946,16 +979,16 @@ begin
       c -> 'location' ->> 'country',
       n_holes,
       coalesce(nullif(t ->> 'par_total', '')::numeric::int,
-               (select sum((h ->> 'par')::numeric::int) from jsonb_array_elements(coalesce(t -> 'holes', '[]'::jsonb)) h),
+               (select sum((h ->> 'par')::numeric::int) from jsonb_array_elements(case when jsonb_typeof(t -> 'holes') = 'array' then t -> 'holes' else '[]'::jsonb end) h),
                n_holes * 4)
     )
     returning id into cid;
     foreach g in array array['male', 'female'] loop
       k := 0;
-      for t in select value from jsonb_array_elements(coalesce(c -> 'tees' -> g, '[]'::jsonb)) loop
+      for t in select value from jsonb_array_elements(gca_tees(c, g)) loop
         select array_agg(nullif(h ->> 'par', '')::numeric::int order by i), array_agg(nullif(h ->> 'handicap', '')::numeric::int order by i)
           into pars, si
-          from jsonb_array_elements(coalesce(t -> 'holes', '[]'::jsonb)) with ordinality as x(h, i)
+          from jsonb_array_elements(case when jsonb_typeof(t -> 'holes') = 'array' then t -> 'holes' else '[]'::jsonb end) with ordinality as x(h, i)
           where i <= n_holes;
         if coalesce(array_length(pars, 1), 0) <> n_holes or array_position(pars, null) is not null then pars := null; end if;
         if coalesce(array_length(si, 1), 0) <> n_holes or array_position(si, null) is not null then si := null; end if;
@@ -981,7 +1014,9 @@ begin
     found := found + 1;
   end loop;
 
-  insert into course_api_log (query, found) values (term, found);
+  insert into course_api_log (query, found, sample) values (term, found, body -> 'courses' -> 0);
+  -- Each full-course lookup counts toward the daily allowance too.
+  insert into course_api_log (query, found) select '(details) ' || term, 0 from generate_series(1, details);
   return jsonb_build_object('source', 'api', 'found', found);
 end $$;
 
