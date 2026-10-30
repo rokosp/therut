@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Platform, Pressable, View } from 'react-native';
 
 import {
   createMatch,
@@ -159,6 +159,8 @@ export function NewMatchForm({ leagueId, edit }: { leagueId: string | null; edit
   // Ask GolfCourseAPI (uses the daily allowance), then show what it saved.
   const searchOnline = () =>
     online.run(async () => {
+      // Online search is switched off on the website for now (Roko's call); the phone app keeps it.
+      if (Platform.OS === 'web') throw new Error('Naughty Sajko tryna use up all my tokens');
       const r = await searchCoursesOnline(query);
       await reload();
       setOnlineNote(
