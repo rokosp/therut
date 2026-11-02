@@ -861,3 +861,31 @@ export async function anyLiveMatch(): Promise<boolean> {
   const res = await supabase.from('matches').select('id').eq('status', 'open').limit(1);
   return !res.error && (res.data?.length ?? 0) > 0;
 }
+
+/** A paper scorecard as read from a photo: one row per name on the card. */
+export type ScannedCard = { players: { name: string; scores: (number | null)[] }[]; notes: string };
+
+/** Send a scorecard photo (base64 JPEG) to be read. Returns the scan id to ask about. */
+export async function startScorecardScan(matchId: string, imageBase64: string, mediaType = 'image/jpeg') {
+  return check(
+    await supabase.rpc('scan_scorecard', { m: matchId, image: imageBase64, media_type: mediaType }),
+  ) as string;
+}
+
+/** Waits for a scan to finish (reading a card takes about 10 to 60 seconds). */
+export async function waitForScorecardScan(scanId: string, isCancelled: () => boolean): Promise<ScannedCard> {
+  const started = Date.now();
+  while (!isCancelled()) {
+    const res = check(await supabase.rpc('scorecard_scan_result', { s: scanId })) as {
+      status: 'pending' | 'done' | 'error';
+      message?: string;
+      players?: ScannedCard['players'];
+      notes?: string;
+    };
+    if (res.status === 'done') return { players: res.players ?? [], notes: res.notes ?? '' };
+    if (res.status === 'error') throw new Error(res.message ?? 'Could not read the card.');
+    if (Date.now() - started > 5 * 60_000) throw new Error('Reading the card took too long. Try again.');
+    await new Promise((r) => setTimeout(r, 2500));
+  }
+  throw new Error('Cancelled');
+}

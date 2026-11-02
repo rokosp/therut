@@ -226,7 +226,6 @@ create policy "members award bonuses" on public.bonus_awards for insert to authe
   with check (public.can_score(match_id) and created_by = auth.uid());
 create policy "awarder or admin removes bonus" on public.bonus_awards for delete to authenticated
   using (created_by = auth.uid() or public.is_league_admin(public.match_league(match_id)));
-
 -- Only the people in a match (plus whoever set it up, and league admins) can enter
 -- its scores and bonuses. Everyone else in the league can watch.
 create or replace function public.can_score(m uuid) returns boolean
@@ -245,7 +244,6 @@ language sql stable security definer set search_path = public as $$
       )
   );
 $$;
-
 -- Friends: players can add each other as friends. Friends see each other's full
 -- profile and match history; everyone else only sees name and handicap.
 
@@ -306,11 +304,9 @@ drop policy if exists "members read bonuses" on public.bonus_awards;
 drop policy if exists "members and friends read bonuses" on public.bonus_awards;
 create policy "members and friends read bonuses" on public.bonus_awards for select to authenticated
   using (public.can_view_match(match_id));
-
 -- Match format: stroke play (fewest strokes) or Stableford (most points).
 alter table public.matches add column if not exists format text not null default 'stroke'
   check (format in ('stroke', 'stableford'));
-
 -- Finished seasons are locked: no more matches, scores, bonuses or settings changes.
 -- Casual matches live outside any league; friends join them with a short code.
 
@@ -398,7 +394,6 @@ begin
   insert into match_players (match_id, user_id) values (mid, auth.uid()) on conflict do nothing;
   return mid;
 end $$;
-
 -- Guest players: people on a scorecard who don't have an account yet.
 -- A league admin can add one, and gets a claim code for them. When the friend signs up,
 -- they enter the code on their Profile and every score, league and bonus moves to their account.
@@ -483,7 +478,6 @@ begin
   delete from auth.users where id = g; -- removes the guest profile and its code too
   return me;
 end $$;
-
 -- Profile photos, stored in a public "avatars" bucket. Each player can only write their own folder.
 alter table public.profiles add column if not exists avatar_url text;
 
@@ -502,7 +496,6 @@ create policy "replace own avatar" on storage.objects for update to authenticate
 drop policy if exists "delete own avatar" on storage.objects;
 create policy "delete own avatar" on storage.objects for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
-
 -- Course search: look courses up on GolfCourseAPI from inside the database, so the API key
 -- never ships in the app (the code is public). Results are saved as normal courses with all
 -- their tees, ratings, slopes, pars and stroke indexes, so each course only costs one request.
@@ -623,7 +616,6 @@ begin
   insert into course_api_log (query, found) values (term, found);
   return jsonb_build_object('source', 'api', 'found', found);
 end $$;
-
 -- Scheduled matches (planned for a future date and time) and in-app notifications.
 
 alter table public.matches drop constraint if exists matches_status_check;
@@ -759,14 +751,12 @@ end $$;
 drop trigger if exists match_started on public.matches;
 create trigger match_started after update of status on public.matches
   for each row execute function public.on_match_started();
-
 -- Fix: creating a match failed with "new row violates row-level security policy".
 -- The read rule looked the match up by id, which can't see a row that is still being
 -- inserted, so the app couldn't get its new match back. Check the row's own columns first.
 drop policy if exists "members and friends read matches" on public.matches;
 create policy "members and friends read matches" on public.matches for select to authenticated
   using (created_by = auth.uid() or public.is_league_member(league_id) or public.can_view_match(id));
-
 -- Inbox notifications for friend requests and accepted requests.
 
 alter table public.notifications drop constraint if exists notifications_kind_check;
@@ -795,13 +785,11 @@ end $$;
 drop trigger if exists friendship_change on public.friendships;
 create trigger friendship_change after insert or update of status on public.friendships
   for each row execute function public.on_friendship_change();
-
 -- Achievements are worked out in the app from match history. This only stores which
 -- badges (up to 4) a player picked to show off on their profile.
 alter table public.profiles add column if not exists showcase text[] not null default '{}';
 alter table public.profiles drop constraint if exists profiles_showcase_max;
 alter table public.profiles add constraint profiles_showcase_max check (coalesce(array_length(showcase, 1), 0) <= 4);
-
 -- Trash talk: short messages and emoji on a match, for anyone who can see the match.
 
 create table if not exists public.match_chat (
@@ -823,7 +811,6 @@ create policy "watchers talk trash" on public.match_chat for insert to authentic
 drop policy if exists "take back your trash" on public.match_chat;
 create policy "take back your trash" on public.match_chat for delete to authenticated
   using (user_id = auth.uid());
-
 -- Riverside Executive hole 3 was a par 3 until autumn 2025 (it's a par 4 now).
 -- Old matches keep the old par through a "2025 layout" copy of each tee, hidden from the
 -- tee picker so new matches use today's layout.
@@ -868,7 +855,6 @@ where mp.match_id = m.id and mp.tee_id is not null
   and l.name = 'Backoutsideboyz' and l.season in ('1', '2') and c.slug = 'riverside-executive'
   and exists (select 1 from public.course_tees n join public.course_tees o on o.id = mp.tee_id
               where n.course_id = o.course_id and n.name = o.name || ' · 2025 layout');
-
 -- Course search fixes:
 -- * Courses whose API data leaves out the hole count no longer break the search
 --   (the count comes from the hole list instead).
@@ -1019,7 +1005,6 @@ begin
   insert into course_api_log (query, found) select '(details) ' || term, 0 from generate_series(1, details);
   return jsonb_build_object('source', 'api', 'found', found);
 end $$;
-
 -- Add a course by hand from the app (for courses the online search doesn't know).
 -- Anyone signed in can add one. Distances per hole are optional (metres).
 
@@ -1091,7 +1076,6 @@ begin
 end $$;
 
 grant execute on function public.add_course(jsonb) to authenticated;
-
 -- League rules: a third match format next to stroke play and Stableford.
 -- Each hole: best score gets 1 point, 2nd 2, 3rd 3 (ties share the average). Fewest points wins.
 -- The app works out the points from the hole scores; the database only stores the format.
@@ -1115,7 +1099,204 @@ where l.id = m.league_id and l.name = 'Backoutsideboyz' and l.season = '2';
 
 update public.leagues set settings = settings || '{"defaultFormat": "league"}'::jsonb
 where name = 'Backoutsideboyz' and season = '2';
+-- Scan a paper scorecard: the app sends a photo, Claude reads the scores, the app shows them
+-- for review before anything is saved.
+-- The Anthropic API key lives only in the Supabase Vault (secret name "anthropic_api_key").
+-- The request runs in the background (pg_net), so slow reads never hit the database time limit:
+-- scan_scorecard() starts it and scorecard_scan_result() is asked every few seconds for the answer.
+create extension if not exists pg_net;
 
+create table if not exists public.scorecard_scans (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid not null references public.matches (id) on delete cascade,
+  user_id uuid not null default auth.uid(),
+  request_id bigint,
+  result jsonb,
+  error text,
+  created_at timestamptz not null default now()
+);
+-- Only reachable through the two functions below.
+alter table public.scorecard_scans enable row level security;
+
+create or replace function public.scan_scorecard(m uuid, image text, media_type text default 'image/jpeg')
+returns uuid
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  api_key text;
+  x matches;
+  n_holes int;
+  offs int;
+  names text;
+  pars text;
+  prompt text;
+  req bigint;
+  sid uuid;
+  schema jsonb;
+begin
+  if auth.uid() is null then raise exception 'Sign in first'; end if;
+  if not can_score(m) then raise exception 'Only players in this match can add scores'; end if;
+  if coalesce(length(image), 0) < 1000 then raise exception 'That photo did not come through. Try again.'; end if;
+  if length(image) > 6000000 then raise exception 'That photo is too big. Try again a bit further away.'; end if;
+  if media_type not in ('image/jpeg', 'image/png', 'image/webp') then media_type := 'image/jpeg'; end if;
+  if (select count(*) from scorecard_scans where user_id = auth.uid() and created_at > now() - interval '1 day') >= 20 then
+    raise exception 'That''s 20 scans today. Enter the rest by hand or try again tomorrow.';
+  end if;
+
+  select decrypted_secret into api_key from vault.decrypted_secrets where name = 'anthropic_api_key' limit 1;
+  if api_key is null then raise exception 'Scorecard scanning is not set up yet (no API key in Supabase).'; end if;
+
+  select * into x from matches where id = m;
+  n_holes := x.holes;
+  offs := case when x.nine = 'back' then 9 else 0 end;
+  select string_agg(coalesce(nullif(p.nickname, ''), p.display_name), ', ')
+    into names
+    from match_players mp join profiles p on p.id = mp.user_id
+   where mp.match_id = m;
+  -- A 9-hole course played twice repeats its pars.
+  select string_agg((offs + i)::text || ':' || coalesce(
+           (t.hole_pars)[((offs + i - 1) % greatest(coalesce(array_length(t.hole_pars, 1), 18), 1)) + 1]::text, '?'),
+           ' ' order by i)
+    into pars
+    from course_tees t, generate_series(1, n_holes) i
+   where t.id = x.tee_id;
+
+  prompt := 'This is a photo of a golf scorecard. Read the strokes each player took on each hole. '
+    || 'The round is ' || n_holes || ' holes, holes ' || (offs + 1) || ' to ' || (offs + n_holes) || '. '
+    || 'Players in the app for this round: ' || coalesce(names, 'unknown') || '. Names on the card may be '
+    || 'nicknames, initials or first names; copy the name exactly as written on the card. '
+    || coalesce('Pars by hole (hole:par): ' || pars || '. ', '')
+    || 'Give one row per player who has scores written on the card, with exactly ' || n_holes
+    || ' numbers in hole order starting at hole ' || (offs + 1) || '. Use null for a hole that is blank '
+    || 'or that you cannot read. Ignore totals (OUT/IN/TOT), handicap, net, points and putts rows. '
+    || 'Scores are gross strokes per hole, usually between 1 and 12. If a number is crossed out, use the '
+    || 'corrected one. In "notes" say briefly anything you were unsure about, or leave it empty.';
+
+  schema := jsonb_build_object(
+    'type', 'object',
+    'additionalProperties', false,
+    'required', jsonb_build_array('players', 'notes'),
+    'properties', jsonb_build_object(
+      'notes', jsonb_build_object('type', 'string'),
+      'players', jsonb_build_object(
+        'type', 'array',
+        'items', jsonb_build_object(
+          'type', 'object',
+          'additionalProperties', false,
+          'required', jsonb_build_array('name', 'scores'),
+          'properties', jsonb_build_object(
+            'name', jsonb_build_object('type', 'string'),
+            'scores', jsonb_build_object(
+              'type', 'array',
+              'items', jsonb_build_object('type', jsonb_build_array('integer', 'null'))
+            )
+          )
+        )
+      )
+    )
+  );
+
+  req := net.http_post(
+    url := 'https://api.anthropic.com/v1/messages',
+    body := jsonb_build_object(
+      'model', 'claude-opus-5-5',
+      'max_tokens', 8000,
+      'fallbacks', 'default',
+      'output_config', jsonb_build_object(
+        'effort', 'medium',
+        'format', jsonb_build_object('type', 'json_schema', 'schema', schema)
+      ),
+      'messages', jsonb_build_array(jsonb_build_object(
+        'role', 'user',
+        'content', jsonb_build_array(
+          jsonb_build_object('type', 'image', 'source', jsonb_build_object(
+            'type', 'base64', 'media_type', media_type, 'data', image)),
+          jsonb_build_object('type', 'text', 'text', prompt)
+        )
+      ))
+    ),
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-api-key', api_key,
+      'anthropic-version', '2023-06-01',
+      'anthropic-beta', 'server-side-fallback-2026-07-01'
+    ),
+    timeout_milliseconds := 150000
+  );
+
+  insert into scorecard_scans (match_id, request_id) values (m, req) returning id into sid;
+  return sid;
+end;
+$$;
+
+-- Asked every few seconds by the app: {status: 'pending'} until the card is read,
+-- then {status: 'done', players: [{name, scores}], notes} or {status: 'error', message}.
+create or replace function public.scorecard_scan_result(s uuid) returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  sc scorecard_scans;
+  r record;
+  body jsonb;
+  txt text;
+  card jsonb;
+begin
+  select * into sc from scorecard_scans where id = s and user_id = auth.uid();
+  if sc.id is null then raise exception 'Scan not found'; end if;
+  if sc.result is not null then return jsonb_build_object('status', 'done') || sc.result; end if;
+  if sc.error is not null then return jsonb_build_object('status', 'error', 'message', sc.error); end if;
+
+  select * into r from net._http_response where id = sc.request_id;
+  if not found then
+    if sc.created_at < now() - interval '4 minutes' then
+      update scorecard_scans set error = 'Reading the card took too long. Try again.' where id = s;
+      return jsonb_build_object('status', 'error', 'message', 'Reading the card took too long. Try again.');
+    end if;
+    return jsonb_build_object('status', 'pending');
+  end if;
+
+  if r.timed_out or r.error_msg is not null then
+    update scorecard_scans set error = 'Could not reach the card reader. Try again.' where id = s;
+    return jsonb_build_object('status', 'error', 'message', 'Could not reach the card reader. Try again.');
+  end if;
+
+  begin
+    body := r.content::jsonb;
+  exception when others then
+    body := null;
+  end;
+  if r.status_code <> 200 or body is null then
+    update scorecard_scans
+       set error = 'The card reader said no (error ' || r.status_code || '): '
+                   || coalesce(body -> 'error' ->> 'message', left(r.content, 200))
+     where id = s returning error into txt;
+    return jsonb_build_object('status', 'error', 'message', txt);
+  end if;
+  if body ->> 'stop_reason' = 'refusal' then
+    update scorecard_scans set error = 'The card reader could not read this photo. Try another one.' where id = s;
+    return jsonb_build_object('status', 'error', 'message', 'The card reader could not read this photo. Try another one.');
+  end if;
+
+  select string_agg(b ->> 'text', '') into txt
+    from jsonb_array_elements(coalesce(body -> 'content', '[]'::jsonb)) b
+   where b ->> 'type' = 'text';
+  begin
+    card := txt::jsonb;
+  exception when others then
+    card := null;
+  end;
+  if card is null or jsonb_typeof(card -> 'players') <> 'array' then
+    update scorecard_scans set error = 'Could not make out the scores. Try a sharper, straight-on photo.' where id = s;
+    return jsonb_build_object('status', 'error', 'message', 'Could not make out the scores. Try a sharper, straight-on photo.');
+  end if;
+
+  update scorecard_scans set result = card where id = s;
+  return jsonb_build_object('status', 'done') || card;
+end;
+$$;
+
+revoke all on function public.scan_scorecard(uuid, text, text) from public, anon;
+revoke all on function public.scorecard_scan_result(uuid) from public, anon;
+grant execute on function public.scan_scorecard(uuid, text, text) to authenticated;
+grant execute on function public.scorecard_scan_result(uuid) to authenticated;
 -- Generated by scripts/gen-course-seed.mjs from data/courses. Do not edit by hand.
 
 insert into public.courses (slug, club_name, name, city, country, holes, par) values ('riverside-championship', 'Riverside Golf Zagreb', 'Riverside Championship', 'Zagreb', 'Croatia', 18, 72)
