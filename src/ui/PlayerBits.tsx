@@ -8,6 +8,7 @@ import { withDefaults } from '@/lib/types';
 
 import { Card, Row, Section, T } from './components';
 import { fonts, radius, space, usePalette } from './theme';
+import { headlineScore, isPointsFormat } from '@/lib/scoring';
 
 /** App HCP in a solid card, own HCP in a dashed one, as in the brand book. */
 export function HcpCards({
@@ -152,21 +153,24 @@ export function HeadToHead({
       const res = resultsFor(m, withDefaults(m.leagues?.settings), courses);
       const a = res.find((r) => r.userId === me);
       const b = res.find((r) => r.userId === them);
-      const stableford = m.format === 'stableford';
+      const stableford = isPointsFormat(m.format);
       return {
         matchId: m.id,
         playedOn: m.played_on,
         mine: a?.position ?? null,
         theirs: b?.position ?? null,
-        myScore: (stableford ? a?.stableford : a?.gross) ?? null,
-        theirScore: (stableford ? b?.stableford : b?.gross) ?? null,
+        myScore: (a ? headlineScore(a, m.format) : null) ?? null,
+        theirScore: (b ? headlineScore(b, m.format) : null) ?? null,
         stableford,
       };
     });
   const h = headToHead(shared);
   if (h.wins + h.losses + h.ties === 0) return null;
   const last = h.last!;
-  const margin = last.myScore != null && last.theirScore != null ? Math.abs(last.myScore - last.theirScore) : null;
+  const margin =
+    last.myScore != null && last.theirScore != null
+      ? Math.round(Math.abs(last.myScore - last.theirScore) * 10) / 10
+      : null;
   const unit = last.stableford ? 'pt' : 'stroke';
   const lastText =
     last.mine! < last.theirs!

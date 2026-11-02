@@ -132,6 +132,7 @@ export default function LeagueSettingsScreen() {
           options={[
             { value: 'stroke', label: 'Stroke play' },
             { value: 'stableford', label: 'Stableford' },
+            { value: 'league', label: 'League rules' },
           ]}
           value={draft.defaultFormat}
           onChange={(v) => set({ defaultFormat: v })}

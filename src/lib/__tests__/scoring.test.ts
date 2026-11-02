@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scoreMatch, type MatchPlayerInput } from '../scoring';
+import { leagueHolePoints, scoreMatch, type MatchPlayerInput } from '../scoring';
 import { buildStandings } from '../standings';
 import { DEFAULT_SETTINGS, withDefaults, type LeagueSettings } from '../types';
 
@@ -159,5 +159,39 @@ describe('stableford', () => {
       ['b', 18, 1],
       ['a', 18, 2],
     ]);
+  });
+});
+
+describe('league rules', () => {
+  const card = (userId: string, holeScores: number[]): MatchPlayerInput => ({ userId, holeScores, courseHandicap: 0 });
+  const settings = { ...gross, minorPoints: [500, 300, 190] };
+
+  it('gives 1, 2, 3 per hole and splits ties', () => {
+    const pts = leagueHolePoints([card('a', [3, 4, 5]), card('b', [3, 5, 5]), card('c', [4, 6, 5])], 3);
+    expect(pts.get('a')).toEqual([1.5, 1, 2]);
+    expect(pts.get('b')).toEqual([1.5, 2, 2]);
+    expect(pts.get('c')).toEqual([3, 3, 2]);
+  });
+
+  it('lowest total wins, even with more strokes', () => {
+    // a wins 5 holes by one and loses 4 holes by three: more strokes, fewer points.
+    const a = [3, 3, 3, 3, 3, 7, 7, 7, 7];
+    const b = [4, 4, 4, 4, 4, 4, 4, 4, 4];
+    const r = scoreMatch({ kind: 'minor', holes: 9, format: 'league' }, [card('a', a), card('b', b)], settings);
+    const ra = r.find((x) => x.userId === 'a')!;
+    const rb = r.find((x) => x.userId === 'b')!;
+    expect(ra.leaguePoints).toBe(13);
+    expect(rb.leaguePoints).toBe(14);
+    expect(ra.position).toBe(1);
+    expect(ra.placePoints).toBe(500);
+    expect(ra.gross! > rb.gross!).toBe(true);
+  });
+
+  it('breaks a tie on points with countback over the last holes', () => {
+    const a = [5, 4, 4, 4, 4, 4, 4, 3, 4];
+    const b = [3, 4, 4, 4, 4, 4, 4, 4, 4];
+    const r = scoreMatch({ kind: 'minor', holes: 9, format: 'league' }, [card('a', a), card('b', b)], settings);
+    expect(r.find((x) => x.userId === 'a')!.position).toBe(1);
+    expect(r.find((x) => x.userId === 'b')!.position).toBe(2);
   });
 });

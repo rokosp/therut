@@ -243,7 +243,7 @@ export async function playerStats(userId: string) {
   };
 }
 
-/** How far ahead of second place the winner finished (strokes, or Stableford points). */
+/** How far ahead of second place the winner finished (strokes, Stableford or league points). */
 function winMarginOf(results: PlayerResult[], userId: string): number | null {
   const ranked = results.filter((x) => x.score != null).sort((a, b) => a.score! - b.score!);
   if (ranked.length < 2 || ranked[0].userId !== userId) return null;
@@ -567,16 +567,14 @@ export async function updateScheduledMatch(
   const added = input.players.filter((p) => !before.has(p.userId));
   if (added.length) {
     check(
-      await supabase
-        .from('match_players')
-        .insert(
-          added.map((p) => ({
-            match_id: match.id,
-            user_id: p.userId,
-            tee_id: p.teeId,
-            course_handicap: p.courseHandicap,
-          })),
-        ),
+      await supabase.from('match_players').insert(
+        added.map((p) => ({
+          match_id: match.id,
+          user_id: p.userId,
+          tee_id: p.teeId,
+          course_handicap: p.courseHandicap,
+        })),
+      ),
     );
   }
 }

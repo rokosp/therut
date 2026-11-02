@@ -49,7 +49,9 @@ export function Friends() {
   const all = data?.all ?? [];
   const stateOf = (id: string) => friendState(userId!, id, all);
   const profileOf = (id: string) => data?.profiles.find((p) => p.id === id);
-  const friends = all.filter((f) => f.status === 'accepted').map((f) => (f.requester === userId ? f.addressee : f.requester));
+  const friends = all
+    .filter((f) => f.status === 'accepted')
+    .map((f) => (f.requester === userId ? f.addressee : f.requester));
   const incoming = all.filter((f) => f.status === 'pending' && f.addressee === userId).map((f) => f.requester);
 
   const act = (fn: () => Promise<void>) => action.run(async () => (await fn(), await reload()));

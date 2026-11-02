@@ -268,8 +268,10 @@ export function NewMatchForm({ leagueId, edit }: { leagueId: string | null; edit
         </T>
         <Segmented
           options={[
-            { value: 'stroke', label: 'Stroke play' },
-            { value: 'stableford', label: 'Stableford' },
+            { value: 'stroke' as const, label: 'Stroke play' },
+            { value: 'stableford' as const, label: 'Stableford' },
+            // League rules compares players hole by hole, so it's for league matches.
+            ...(leagueId ? [{ value: 'league' as const, label: 'League rules' }] : []),
           ]}
           value={format ?? settings.defaultFormat}
           onChange={setFormat}
@@ -277,7 +279,9 @@ export function NewMatchForm({ leagueId, edit }: { leagueId: string | null; edit
         <T variant="label" muted>
           {(format ?? settings.defaultFormat) === 'stroke'
             ? 'Fewest strokes wins.'
-            : 'Points per hole: par 2, birdie 3, eagle 4, bogey 1, worse 0. Most points wins. Needs hole-by-hole scores.'}
+            : (format ?? settings.defaultFormat) === 'league'
+              ? 'Each hole: best score gets 1 point, 2nd gets 2, 3rd gets 3. Ties share (two tied for 1st get 1.5 each). Fewest points wins. Needs hole-by-hole scores.'
+              : 'Points per hole: par 2, birdie 3, eagle 4, bogey 1, worse 0. Most points wins. Needs hole-by-hole scores.'}
         </T>
         <T variant="eyebrow" muted>
           {later ? 'Date' : 'Date played'}

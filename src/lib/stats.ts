@@ -22,7 +22,11 @@ const holesText = (hs: number[]) => `${hs.length === 1 ? 'hole' : 'holes'} ${joi
 const toParText = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : String(n));
 
 /** Notable things that happened in one match: aces, eagles, birdies, pars and each player's worst hole. */
-export function matchHappenings(opts: { players: CardInput[]; holePars: number[] | null; holeOffset?: number }): Happening[] {
+export function matchHappenings(opts: {
+  players: CardInput[];
+  holePars: number[] | null;
+  holeOffset?: number;
+}): Happening[] {
   const { players, holePars } = opts;
   const offset = opts.holeOffset ?? 0;
   const out: Happening[] = [];
@@ -52,7 +56,10 @@ export function matchHappenings(opts: { players: CardInput[]; holePars: number[]
     });
     const w = worst as { over: number; strokes: number; hole: number } | null;
     if (w && w.over >= 2) {
-      out.push({ kind: 'ouch', text: `${p.name}'s worst hole: ${an(w.strokes)} ${w.strokes} on hole ${w.hole} (${toParText(w.over)}).` });
+      out.push({
+        kind: 'ouch',
+        text: `${p.name}'s worst hole: ${an(w.strokes)} ${w.strokes} on hole ${w.hole} (${toParText(w.over)}).`,
+      });
     }
   }
   return out;
@@ -98,7 +105,16 @@ interface Tally {
 export function seasonTallies(cards: SeasonCard[]): Map<string, Tally> {
   const t = new Map<string, Tally>();
   for (const c of cards) {
-    const x = t.get(c.userId) ?? { rounds: 0, wins: 0, birdies: 0, eagles: 0, pars: 0, blowups: 0, worst: null, best: null };
+    const x = t.get(c.userId) ?? {
+      rounds: 0,
+      wins: 0,
+      birdies: 0,
+      eagles: 0,
+      pars: 0,
+      blowups: 0,
+      worst: null,
+      best: null,
+    };
     x.rounds += 1;
     if (c.won) x.wins += 1;
     (c.holeScores ?? []).forEach((s, i) => {
@@ -115,7 +131,8 @@ export function seasonTallies(cards: SeasonCard[]): Map<string, Tally> {
     });
     if (c.gross != null) {
       const toPar = c.gross - c.par;
-      if (!x.best || toPar < x.best.toPar) x.best = { toPar, gross: c.gross, par: c.par, course: c.courseName, playedOn: c.playedOn };
+      if (!x.best || toPar < x.best.toPar)
+        x.best = { toPar, gross: c.gross, par: c.par, course: c.courseName, playedOn: c.playedOn };
     }
     t.set(c.userId, x);
   }
@@ -137,7 +154,13 @@ export function seasonAwards(cards: SeasonCard[]): Award[] {
   const tallies = seasonTallies(cards);
   const e = [...tallies.entries()];
   const out: Award[] = [];
-  const push = (key: string, title: string, l: { ids: string[]; best: number } | null, value: string, detail: string) => {
+  const push = (
+    key: string,
+    title: string,
+    l: { ids: string[]; best: number } | null,
+    value: string,
+    detail: string,
+  ) => {
     if (l) out.push({ key, title, userIds: l.ids, value, detail });
   };
 
@@ -171,7 +194,6 @@ export function seasonAwards(cards: SeasonCard[]): Award[] {
   return out;
 }
 
-
 // Career ------------------------------------------------------------------
 
 export interface CareerRound {
@@ -200,8 +222,17 @@ export interface Career {
 /** Lifetime totals from every scorecard: holes, strokes and how each hole went against par. */
 export function careerHighlights(rounds: CareerRound[]): Career {
   const out: Career = {
-    rounds: 0, holesPlayed: 0, strokes: 0, aces: 0, eagles: 0, birdies: 0, pars: 0, bogeys: 0, doubles: 0,
-    best18: null, best9: null,
+    rounds: 0,
+    holesPlayed: 0,
+    strokes: 0,
+    aces: 0,
+    eagles: 0,
+    birdies: 0,
+    pars: 0,
+    bogeys: 0,
+    doubles: 0,
+    best18: null,
+    best9: null,
   };
   for (const r of rounds) {
     const scored = (r.holeScores ?? []).filter((s): s is number => s != null && s > 0);
@@ -254,7 +285,9 @@ export function headToHead(ms: H2HMatch[]) {
   let wins = 0;
   let losses = 0;
   let ties = 0;
-  const done = ms.filter((m) => m.mine != null && m.theirs != null).sort((a, b) => b.playedOn.localeCompare(a.playedOn));
+  const done = ms
+    .filter((m) => m.mine != null && m.theirs != null)
+    .sort((a, b) => b.playedOn.localeCompare(a.playedOn));
   for (const m of done) {
     if (m.mine! < m.theirs!) wins += 1;
     else if (m.mine! > m.theirs!) losses += 1;

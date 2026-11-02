@@ -65,7 +65,13 @@ describe('careerHighlights', () => {
     const c = careerHighlights([
       { holes: 9, holeScores: [3, 3, 5, 4, 4, 1, 5, 4, 8], holePars: pars, gross: 37, par: 36 },
       { holes: 18, holeScores: null, holePars: null, gross: 90, par: 72 },
-      { holes: 9, holeScores: [5, null, null, null, null, null, null, null, null], holePars: pars, gross: null, par: 36 },
+      {
+        holes: 9,
+        holeScores: [5, null, null, null, null, null, null, null, null],
+        holePars: pars,
+        gross: null,
+        par: 36,
+      },
     ]);
     expect(c.rounds).toBe(3);
     expect(c.holesPlayed).toBe(9 + 18 + 1);

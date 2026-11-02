@@ -31,6 +31,7 @@ export default function NewLeague() {
         options={[
           { value: 'stroke', label: 'Stroke play' },
           { value: 'stableford', label: 'Stableford' },
+          { value: 'league', label: 'League rules' },
         ]}
         value={format}
         onChange={setFormat}

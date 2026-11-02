@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { displayName, holesFor, leagueTitle, resultsFor, type Course, type LiveMatch, type Profile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { buildCommentary } from '@/lib/commentary';
-import { stablefordPoints } from '@/lib/scoring';
+import { headlineScore, isPointsFormat, leagueHolePoints, stablefordPoints } from '@/lib/scoring';
 import { strokesPerHole } from '@/lib/handicap';
 import { withDefaults } from '@/lib/types';
 import { Button, Card, Row, T, Tag } from '@/ui/components';
@@ -21,6 +21,13 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
   const { course, played } = holesFor(match, courses);
   const net = settings.scoring === 'net';
   const stableford = match.format === 'stableford';
+  const league = match.format === 'league';
+  const lp = league
+    ? leagueHolePoints(
+        match.match_players.map((p) => ({ userId: p.user_id, holeScores: p.hole_scores, courseHandicap: 0 })),
+        played.holes,
+      )
+    : null;
   const nameOf = (id: string) => displayName(profiles.find((p) => p.id === id));
 
   const rows = match.match_players
@@ -37,10 +44,18 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
         toPar += adj - (played.holePars?.[i] ?? 0);
       });
       const sf = stablefordPoints(p.hole_scores, played.holePars) ?? 0;
-      return { id: p.user_id, thru, total, toPar, sf };
+      const lpts = (lp?.get(p.user_id) ?? []).reduce<number>((a, b) => a + (b ?? 0), 0);
+      return { id: p.user_id, thru, total, toPar, sf, lpts };
     })
     .sort(
-      (a, b) => (stableford ? b.sf - a.sf : played.holePars ? a.toPar - b.toPar : a.total - b.total) || b.thru - a.thru,
+      (a, b) =>
+        (stableford
+          ? b.sf - a.sf
+          : league
+            ? a.lpts - b.lpts
+            : played.holePars
+              ? a.toPar - b.toPar
+              : a.total - b.total) || b.thru - a.thru,
     );
 
   const feed = buildCommentary({
@@ -87,7 +102,15 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
             {r.thru === 0 ? 'not started' : r.thru === played.holes ? 'F' : `thru ${r.thru}`}
           </T>
           <T style={{ width: 52, textAlign: 'right', fontFamily: fonts.num, fontSize: 24 }}>
-            {r.thru === 0 ? '–' : stableford ? `${r.sf}` : played.holePars ? fmt(r.toPar) : r.total}
+            {r.thru === 0
+              ? '–'
+              : stableford
+                ? `${r.sf}`
+                : league
+                  ? `${r.lpts}`
+                  : played.holePars
+                    ? fmt(r.toPar)
+                    : r.total}
           </T>
         </Row>
       ))}
@@ -102,7 +125,7 @@ export function MatchCard({ match, profiles, courses }: { match: LiveMatch; prof
         </View>
       ) : null}
       <T variant="label" muted>
-        {stableford ? 'Stableford points' : 'Stroke play, to par'} ·{' '}
+        {stableford ? 'Stableford points' : league ? 'League rules points' : 'Stroke play, to par'} ·{' '}
         {match.status === 'open'
           ? 'tap to watch'
           : match.status === 'scheduled'
@@ -138,7 +161,13 @@ export function PastMatchCard({
   const scores = mine?.hole_scores ?? [];
   const complete = scores.length === played.holes && scores.every((s) => s != null);
   const gross = complete ? (scores as number[]).reduce((a, b) => a + b, 0) : (mine?.gross ?? null);
-  const pts = match.format === 'stableford' ? stablefordPoints(mine?.hole_scores, played.holePars) : null;
+  const pts =
+    match.format === 'stableford'
+      ? stablefordPoints(mine?.hole_scores, played.holePars)
+      : match.format === 'league'
+        ? (resultsFor(match, withDefaults(match.leagues?.settings), courses).find((r) => r.userId === userId)
+            ?.leaguePoints ?? null)
+        : null;
   return (
     <Card onPress={() => setOpen(!open)}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -171,7 +200,7 @@ export function PastMatchCard({
 function TopThree({ match, courses, profiles }: { match: LiveMatch; courses: Course[]; profiles: Profile[] }) {
   const c = usePalette();
   const { played } = holesFor(match, courses);
-  const stableford = match.format === 'stableford';
+  const pointsFmt = isPointsFormat(match.format);
   const top = resultsFor(match, withDefaults(match.leagues?.settings), courses)
     .filter((r) => r.position != null)
     .slice(0, 3);
@@ -188,10 +217,10 @@ function TopThree({ match, courses, profiles }: { match: LiveMatch; courses: Cou
             <T style={{ fontFamily: fonts.bodyBold }}>{displayName(profiles.find((p) => p.id === r.userId))}</T>
           </PlayerLink>
           <T variant="label" muted>
-            {stableford ? 'pts' : r.gross != null ? toPar(r.gross - played.par) : ''}
+            {pointsFmt ? 'pts' : r.gross != null ? toPar(r.gross - played.par) : ''}
           </T>
           <T style={{ width: 48, textAlign: 'right', fontFamily: fonts.num, fontSize: 24 }}>
-            {(stableford ? r.stableford : r.gross) ?? '–'}
+            {headlineScore(r, match.format) ?? '–'}
           </T>
         </Row>
       ))}

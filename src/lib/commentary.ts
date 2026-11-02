@@ -54,11 +54,16 @@ export function buildCommentary(opts: {
     for (const p of scored) {
       const g = p.holeScores![i] as number;
       if (g === 1) lines.push({ hole: i, kind: 'great', text: `HOLE IN ONE! ${p.name} aces ${label}!` });
-      else if (par != null && g <= par - 3) lines.push({ hole: i, kind: 'great', text: `Albatross! ${p.name} makes ${g} on the par ${par} ${label}.` });
-      else if (par != null && g === par - 2) lines.push({ hole: i, kind: 'great', text: `Eagle! ${p.name} makes ${g} on the par ${par} ${label}.` });
-      else if (par != null && g === par - 1) lines.push({ hole: i, kind: 'great', text: `${p.name} birdies ${label}.` });
-      else if (par != null ? g >= par + 4 : g >= 9) lines.push({ hole: i, kind: 'ouch', text: `${p.name} shot ${an(g)} ${g} on ${label}, yikes!` });
-      else if (par != null && g === par + 3) lines.push({ hole: i, kind: 'ouch', text: `${p.name} takes a triple on ${label}. Shake it off.` });
+      else if (par != null && g <= par - 3)
+        lines.push({ hole: i, kind: 'great', text: `Albatross! ${p.name} makes ${g} on the par ${par} ${label}.` });
+      else if (par != null && g === par - 2)
+        lines.push({ hole: i, kind: 'great', text: `Eagle! ${p.name} makes ${g} on the par ${par} ${label}.` });
+      else if (par != null && g === par - 1)
+        lines.push({ hole: i, kind: 'great', text: `${p.name} birdies ${label}.` });
+      else if (par != null ? g >= par + 4 : g >= 9)
+        lines.push({ hole: i, kind: 'ouch', text: `${p.name} shot ${an(g)} ${g} on ${label}, yikes!` });
+      else if (par != null && g === par + 3)
+        lines.push({ hole: i, kind: 'ouch', text: `${p.name} takes a triple on ${label}. Shake it off.` });
     }
 
     // Head-to-head lines only once everyone has finished the hole.
@@ -78,7 +83,11 @@ export function buildCommentary(opts: {
         text: `${winners[0].name} wins ${label} by ${margin} ${s(margin)}${net ? ' net' : ''}${margin >= 3 ? '!' : '.'}`,
       });
     } else if (winners.length === players.length) {
-      lines.push({ hole: i, kind: 'hole', text: `${label[0].toUpperCase()}${label.slice(1)} halved${net ? ' (net)' : ''}.` });
+      lines.push({
+        hole: i,
+        kind: 'hole',
+        text: `${label[0].toUpperCase()}${label.slice(1)} halved${net ? ' (net)' : ''}.`,
+      });
     } else {
       lines.push({ hole: i, kind: 'hole', text: `${joinNames(winners.map((p) => p.name))} share ${label}.` });
     }

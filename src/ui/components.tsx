@@ -35,7 +35,9 @@ export function Screen({
         contentContainerStyle={{ padding: padded ? space.l : 0, gap: space.l, paddingBottom: space.xxxl }}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={c.primary} /> : undefined
+          onRefresh ? (
+            <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={c.primary} />
+          ) : undefined
         }>
         {children}
       </ScrollView>
@@ -62,7 +64,12 @@ type Variant = 'display' | 'h1' | 'h2' | 'title' | 'body' | 'label' | 'eyebrow' 
 export function T({ variant = 'body', muted, style, ...rest }: TextProps & { variant?: Variant; muted?: boolean }) {
   const c = usePalette();
   const v: Record<Variant, object> = {
-    display: { fontFamily: fonts.displayBlack, fontSize: type.display, lineHeight: type.display * 0.95, textTransform: 'uppercase' },
+    display: {
+      fontFamily: fonts.displayBlack,
+      fontSize: type.display,
+      lineHeight: type.display * 0.95,
+      textTransform: 'uppercase',
+    },
     h1: { fontFamily: fonts.displayBlack, fontSize: 28, lineHeight: 28, textTransform: 'uppercase' },
     h2: { fontFamily: fonts.display, fontSize: 22, lineHeight: 24, textTransform: 'uppercase' },
     title: { fontFamily: fonts.bodyBold, fontSize: 15 },
@@ -166,7 +173,14 @@ export function Field({ label, hint, secureTextEntry, ...props }: TextInputProps
             accessibilityLabel={show ? 'Hide password' : 'Show password'}
             onPress={() => setShow(!show)}
             hitSlop={8}
-            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: space.m }}>
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              paddingHorizontal: space.m,
+            }}>
             <T variant="eyebrow" style={{ color: c.accentText, fontSize: 11 }}>
               {show ? 'Hide' : 'Show'}
             </T>
@@ -204,7 +218,9 @@ export function Segmented<V extends string | number>({
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.value)}
             style={[styles.segment, { backgroundColor: on ? c.primary : 'transparent' }]}>
-            <Text style={{ color: on ? c.onPrimary : c.text, fontFamily: fonts.bodyBold, fontSize: 13 }}>{o.label}</Text>
+            <Text style={{ color: on ? c.onPrimary : c.text, fontFamily: fonts.bodyBold, fontSize: 13 }}>
+              {o.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -217,7 +233,10 @@ export function Chip({ label, on, onPress }: { label: string; on?: boolean; onPr
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chip, { borderColor: on ? c.primary : c.border, backgroundColor: on ? c.primary : 'transparent' }]}>
+      style={[
+        styles.chip,
+        { borderColor: on ? c.primary : c.border, backgroundColor: on ? c.primary : 'transparent' },
+      ]}>
       <Text style={{ color: on ? c.onPrimary : c.text, fontFamily: fonts.bodyMedium, fontSize: 13 }}>{label}</Text>
     </Pressable>
   );
@@ -237,7 +256,14 @@ export function Tag({ kind, label }: { kind: 'major' | 'minor' | 'bonus' | 'live
   }[kind];
   return (
     <View style={[styles.tag, { backgroundColor: look.bg, borderColor: look.border }]}>
-      <Text style={{ color: look.fg, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+      <Text
+        style={{
+          color: look.fg,
+          fontFamily: fonts.mono,
+          fontSize: 10,
+          letterSpacing: 0.6,
+          textTransform: 'uppercase',
+        }}>
         {label}
       </Text>
     </View>
@@ -286,7 +312,13 @@ export function HeaderTitle({ title }: { title: string }) {
       />
       <Text
         numberOfLines={1}
-        style={{ color: c.text, fontFamily: fonts.displayBlack, fontSize: 24, textTransform: 'uppercase', maxWidth: 240 }}>
+        style={{
+          color: c.text,
+          fontFamily: fonts.displayBlack,
+          fontSize: 24,
+          textTransform: 'uppercase',
+          maxWidth: 240,
+        }}>
         {title}
       </Text>
     </Row>
@@ -338,5 +370,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tag: { borderRadius: radius.chip, borderWidth: 1.5, paddingHorizontal: 9, paddingVertical: 2, alignSelf: 'flex-start' },
+  tag: {
+    borderRadius: radius.chip,
+    borderWidth: 1.5,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
 });

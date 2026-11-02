@@ -5,6 +5,7 @@ import { Pressable, Share, View } from 'react-native';
 import { displayName, finishSeason, getLeague, listCourses, resultsFor } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { buildStandings } from '@/lib/standings';
+import { formatName } from '@/lib/scoring';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, ErrorText, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
@@ -170,7 +171,7 @@ export default function LeagueScreen() {
           <Card key={m.id} onPress={() => router.push(`/match/${m.id}`)}>
             <Row style={{ flexWrap: 'wrap' }}>
               <Tag kind={m.kind} label={`${m.kind} · ${m.holes}`} />
-              <Tag kind="final" label={m.format === 'stableford' ? 'Stableford' : 'Stroke play'} />
+              <Tag kind="final" label={formatName(m.format)} />
               {m.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
               {m.status === 'open' ? <Tag kind="live" label="● Live" /> : null}
               {m.status === 'scheduled' ? <Tag kind="bonus" label="Upcoming" /> : null}

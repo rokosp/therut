@@ -19,7 +19,15 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { buildCommentary, type CommentaryLine } from '@/lib/commentary';
-import { stablefordHole, stablefordPoints } from '@/lib/scoring';
+import {
+  formatName,
+  formatPoints,
+  headlineScore,
+  isPointsFormat,
+  leagueHolePoints,
+  stablefordHole,
+  stablefordPoints,
+} from '@/lib/scoring';
 import { matchHappenings, type Happening } from '@/lib/stats';
 import { useAction, useLoad } from '@/lib/useLoad';
 import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
@@ -80,6 +88,13 @@ export default function MatchScreen() {
   const nameOf = (uid: string) => displayName(members.find((m) => m.user_id === uid)?.profiles);
   const results = resultsFor(match, settings, courses);
   const isStableford = match.format === 'stableford';
+  // Ranks on points (Stableford or League rules) rather than strokes.
+  const pointsFmt = isPointsFormat(match.format);
+  const fmtName = formatName(match.format);
+  const leagueOnHole = leagueHolePoints(
+    match.match_players.map((p) => ({ userId: p.user_id, holeScores: p.hole_scores, courseHandicap: 0 })),
+    match.holes,
+  );
   const holeOffset = match.nine === 'back' ? 9 : 0;
 
   /** Update one player's row locally straight away, then save in order. */
@@ -154,7 +169,7 @@ export default function MatchScreen() {
           <Row style={{ flexWrap: 'wrap' }}>
             <Tag kind="bonus" label="Upcoming" />
             <Tag kind={match.kind} label={casual ? `${match.holes} holes` : `${match.kind} · ${match.holes}`} />
-            <Tag kind="final" label={isStableford ? 'Stableford' : 'Stroke play'} />
+            <Tag kind="final" label={fmtName} />
           </Row>
           <T variant="eyebrow" style={{ color: c.accentText }}>
             {league ? leagueTitle(league) : 'Casual round'}
@@ -252,7 +267,7 @@ export default function MatchScreen() {
         <View style={{ gap: space.s }}>
           <Row style={{ flexWrap: 'wrap' }}>
             <Tag kind={match.kind} label={`${match.kind} · ${match.holes}`} />
-            <Tag kind="final" label={isStableford ? 'Stableford' : 'Stroke play'} />
+            <Tag kind="final" label={fmtName} />
             {match.bonus_awards.length ? <Tag kind="bonus" label="Bonus" /> : null}
             {match.status === 'open' ? <Tag kind="live" label="● Live" /> : <Tag kind="final" label="Final" />}
           </Row>
@@ -348,6 +363,11 @@ export default function MatchScreen() {
                               {stablefordHole(value, parOf(hole)!)} pts
                             </T>
                           ) : null}
+                          {match.format === 'league' && value != null ? (
+                            <T variant="label" muted>
+                              {leagueOnHole.get(p.user_id)?.[hole] ?? '–'} pts this hole
+                            </T>
+                          ) : null}
                         </View>
                         <Stepper
                           value={value}
@@ -411,7 +431,7 @@ export default function MatchScreen() {
               title="Result"
               right={
                 <T variant="eyebrow" muted>
-                  {isStableford ? 'Stableford' : 'Stroke play'}
+                  {fmtName}
                 </T>
               }
             />
@@ -456,15 +476,17 @@ export default function MatchScreen() {
                         {teeOf(p)?.name ?? ''}
                         {showScores
                           ? [
-                              isStableford && r.gross != null ? ` · ${r.gross} strokes` : '',
+                              pointsFmt && r.gross != null ? ` · ${r.gross} strokes` : '',
                               !casual ? ` · +${r.total} league pts` : '',
                               r.bonusPoints ? ` (${r.bonusPoints} bonus)` : '',
                               r.gross == null ? ' · card not finished' : '',
                             ].join('')
                           : [
-                              isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : '',
+                              pointsFmt && formatPoints(r, match.format) != null && !casual
+                                ? ` · ${formatPoints(r, match.format)} pts`
+                                : '',
                               r.gross != null
-                                ? casual && !isStableford
+                                ? casual && !pointsFmt
                                   ? ''
                                   : ` · ${r.gross} strokes`
                                 : ' · card not finished',
@@ -478,7 +500,7 @@ export default function MatchScreen() {
                         fontSize: 28,
                         color: lead ? c.onLeader : c.text,
                       }}>
-                      {casual || showScores ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
+                      {casual || showScores ? (headlineScore(r, match.format) ?? '–') : r.total}
                     </T>
                   </Row>
                 );
@@ -493,7 +515,12 @@ export default function MatchScreen() {
 
             {match.status === 'final' ? (
               <Rundown
-                summary={rundownText(results, nameOf, isStableford, played.par)}
+                summary={rundownText(
+                  results,
+                  nameOf,
+                  pointsFmt ? (r) => formatPoints(r, match.format) : null,
+                  played.par,
+                )}
                 happenings={matchHappenings({
                   players: match.match_players.map((p) => ({
                     userId: p.user_id,
@@ -538,10 +565,18 @@ export default function MatchScreen() {
                 }}>
                 <View>
                   <T variant="eyebrow" muted>
-                    {isStableford ? 'Your Stableford' : 'Your strokes'}
+                    {match.format === 'league'
+                      ? 'Your league points'
+                      : isStableford
+                        ? 'Your Stableford'
+                        : 'Your strokes'}
                   </T>
                   <T variant="score" style={{ fontSize: 56, lineHeight: 54 }}>
-                    {(isStableford ? myStableford : myResult.gross) ?? '–'}
+                    {(match.format === 'league'
+                      ? myResult.leaguePoints
+                      : isStableford
+                        ? myStableford
+                        : myResult.gross) ?? '–'}
                   </T>
                 </View>
                 {!casual ? (
@@ -567,7 +602,7 @@ export default function MatchScreen() {
               title="Standings so far"
               right={
                 <T variant="eyebrow" muted>
-                  {isStableford ? 'Stableford' : 'Stroke play'}
+                  {fmtName}
                 </T>
               }
             />
@@ -612,15 +647,17 @@ export default function MatchScreen() {
                         {teeOf(p)?.name ?? ''}
                         {showScores
                           ? [
-                              isStableford && r.gross != null ? ` · ${r.gross} strokes` : '',
+                              pointsFmt && r.gross != null ? ` · ${r.gross} strokes` : '',
                               !casual ? ` · +${r.total} league pts` : '',
                               r.bonusPoints ? ` (${r.bonusPoints} bonus)` : '',
                               r.gross == null ? ' · card not finished' : '',
                             ].join('')
                           : [
-                              isStableford && r.stableford != null && !casual ? ` · ${r.stableford} pts` : '',
+                              pointsFmt && formatPoints(r, match.format) != null && !casual
+                                ? ` · ${formatPoints(r, match.format)} pts`
+                                : '',
                               r.gross != null
-                                ? casual && !isStableford
+                                ? casual && !pointsFmt
                                   ? ''
                                   : ` · ${r.gross} strokes`
                                 : ' · card not finished',
@@ -634,7 +671,7 @@ export default function MatchScreen() {
                         fontSize: 28,
                         color: lead ? c.onLeader : c.text,
                       }}>
-                      {casual || showScores ? ((isStableford ? r.stableford : r.gross) ?? '–') : r.total}
+                      {casual || showScores ? (headlineScore(r, match.format) ?? '–') : r.total}
                     </T>
                   </Row>
                 );
@@ -1183,24 +1220,26 @@ function rundownText(
     position: number | null;
     gross: number | null;
     stableford: number | null;
+    leaguePoints: number | null;
     tiebreakNote: string | null;
   }[],
   nameOf: (id: string) => string,
-  stableford: boolean,
+  /** For points formats: a player's points. Null for stroke play. */
+  pts: ((r: { stableford: number | null; leaguePoints: number | null }) => number | null) | null,
   par: number,
 ): string | null {
-  const done = results.filter((r) => r.position != null && (stableford ? r.stableford != null : r.gross != null));
+  const stableford = !!pts;
+  const done = results.filter((r) => r.position != null && (pts ? pts(r) != null : r.gross != null));
   if (done.length === 0) return null;
-  const score = (r: (typeof done)[number]) =>
-    stableford ? `${r.stableford} points` : `${r.gross} (${toParText(r.gross! - par)})`;
+  const score = (r: (typeof done)[number]) => (pts ? `${pts(r)} points` : `${r.gross} (${toParText(r.gross! - par)})`);
   const firsts = done.filter((r) => r.position === 1);
   const names = firsts.map((r) => nameOf(r.userId));
   if (done.length === 1) return `${names[0]} went round in ${score(done[0])}.`;
   if (firsts.length > 1) return `${names.join(' and ')} tied for the win on ${score(firsts[0])}.`;
   const win = firsts[0];
   const second = done.filter((r) => r.position !== 1).sort((a, b) => a.position! - b.position!)[0];
-  const gap = stableford ? second.stableford! - win.stableford! : second.gross! - win.gross!;
-  const margin = Math.abs(gap);
+  const gap = pts ? pts(second)! - pts(win)! : second.gross! - win.gross!;
+  const margin = Math.round(Math.abs(gap) * 10) / 10;
   const how =
     margin === 0
       ? `edging ${nameOf(second.userId)}${win.tiebreakNote ? ` on ${win.tiebreakNote}` : ''}`

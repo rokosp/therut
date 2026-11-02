@@ -19,6 +19,8 @@ export interface MatchInput {
   format?: MatchFormat;
   /** Needed for Stableford. */
   holePars?: number[] | null;
+  /** Filled in by scoreMatch for League rules. */
+  leaguePerHole?: Map<string, (number | null)[]>;
 }
 
 /** Stableford points for one hole: 2 for par, one more per stroke under, one less per stroke over, never below 0. */
@@ -39,6 +41,33 @@ export function stablefordPoints(holeScores: (number | null)[] | null | undefine
   return any ? total : null;
 }
 
+/**
+ * League rules points per hole for every player: on each hole the best score gets 1, the next 2
+ * and so on, with tied players sharing the average of their places (two tied for 1st get 1.5
+ * each). Only players with a score on a hole are ranked on it.
+ */
+export function leagueHolePoints(players: MatchPlayerInput[], holes: number): Map<string, (number | null)[]> {
+  const out = new Map(players.map((p) => [p.userId, Array<number | null>(holes).fill(null)]));
+  for (let h = 0; h < holes; h++) {
+    const scored = players
+      .map((p) => ({ id: p.userId, s: p.holeScores?.[h] }))
+      .filter((x): x is { id: string; s: number } => x.s != null && x.s > 0)
+      .sort((a, b) => a.s - b.s);
+    let i = 0;
+    while (i < scored.length) {
+      let j = i;
+      while (j + 1 < scored.length && scored[j + 1].s === scored[i].s) j++;
+      // Places i+1 .. j+1 shared: average them.
+      const pts = (i + 1 + (j + 1)) / 2;
+      for (let k = i; k <= j; k++) out.get(scored[k].id)![h] = pts;
+      i = j + 1;
+    }
+  }
+  return out;
+}
+
+const sumPts = (xs: (number | null)[]) => xs.reduce<number>((a, b) => a + (b ?? 0), 0);
+
 export interface BonusInput {
   userId: string;
   points: number;
@@ -48,6 +77,8 @@ export interface PlayerResult {
   userId: string;
   /** Stableford points (Stableford matches only). */
   stableford: number | null;
+  /** League rules points so far, lower is better (League rules matches only). */
+  leaguePoints: number | null;
   gross: number | null;
   net: number | null;
   /** The score the match is ranked on (gross or net). */
@@ -119,6 +150,15 @@ function breakTie(
       note: settings.tiebreak === 'playoff' ? 'Playoff' : 'Winner picked',
     };
   }
+  if (settings.tiebreak === 'countback' && match.format === 'league' && match.leaguePerHole) {
+    // Fewest league points over the last 9, 6, 3 and 1 holes.
+    const segments = match.holes === 18 ? [9, 6, 3, 1] : [6, 3, 1];
+    const keyOf = (p: MatchPlayerInput) => {
+      const ph = match.leaguePerHole!.get(p.userId) ?? [];
+      return segments.map((len) => sumPts(ph.slice(match.holes - len)));
+    };
+    return { groups: groupBy(players, (a, b) => compareKeys(keyOf(a), keyOf(b))), note: 'Countback' };
+  }
   if (settings.tiebreak === 'countback') {
     const sf = match.format === 'stableford' ? match.holePars : null;
     const keys = new Map(players.map((p) => [p, countbackKey(p, match.holes, settings.scoring === 'net', sf)]));
@@ -161,13 +201,28 @@ export function scoreMatch(
   for (const b of bonuses) bonusBy.set(b.userId, (bonusBy.get(b.userId) ?? 0) + b.points);
 
   const stableford = match.format === 'stableford';
+  const league = match.format === 'league';
+  if (league) match = { ...match, leaguePerHole: leagueHolePoints(players, match.holes) };
   const scored = players.map((p) => {
     const gross = grossOf(p, match.holes);
     const netScore = gross == null ? null : gross - p.courseHandicap;
     // Stableford ranks on points over completed cards; negated so lower still ranks first.
     const sf = stableford && completeHoles(p, match.holes) ? stablefordPoints(p.holeScores, match.holePars) : null;
-    const score = stableford ? (sf == null ? null : -sf) : net ? netScore : gross;
-    return { p, gross, net: netScore, score, sf };
+    const perHole = league ? match.leaguePerHole!.get(p.userId)! : null;
+    const lp = perHole && perHole.some((x) => x != null) ? sumPts(perHole) : null;
+    // League rules ranks on points once the card is complete, like Stableford.
+    const score = stableford
+      ? sf == null
+        ? null
+        : -sf
+      : league
+        ? completeHoles(p, match.holes)
+          ? lp
+          : null
+        : net
+          ? netScore
+          : gross;
+    return { p, gross, net: netScore, score, sf, lp };
   });
 
   const finished = scored.filter((s) => s.score != null);
@@ -186,6 +241,7 @@ export function scoreMatch(
         results.push({
           userId: p.userId,
           stableford: s.sf,
+          leaguePoints: s.lp,
           gross: s.gross,
           net: s.net,
           score: s.score,
@@ -207,6 +263,7 @@ export function scoreMatch(
     results.push({
       userId: s.p.userId,
       stableford: null,
+      leaguePoints: s.lp,
       gross: s.gross,
       net: null,
       score: null,
@@ -219,4 +276,32 @@ export function scoreMatch(
     });
   }
   return results;
+}
+
+export const FORMAT_NAMES: Record<MatchFormat, string> = {
+  stroke: 'Stroke play',
+  stableford: 'Stableford',
+  league: 'League rules',
+};
+
+/** Format name for a match row (older rows have no format: stroke play). */
+export const formatName = (f: MatchFormat | null | undefined) => FORMAT_NAMES[f ?? 'stroke'];
+
+/** Whether the format ranks on points rather than strokes. */
+export const isPointsFormat = (f: MatchFormat | null | undefined) => f === 'stableford' || f === 'league';
+
+/** Points shown for a player: Stableford or League rules points, else null. Halves stay as .5. */
+export function formatPoints(
+  r: { stableford: number | null; leaguePoints?: number | null },
+  f: MatchFormat | null | undefined,
+) {
+  return f === 'stableford' ? r.stableford : f === 'league' ? (r.leaguePoints ?? null) : null;
+}
+
+/** The headline number for a player: points for points formats, strokes otherwise. */
+export function headlineScore(
+  r: { stableford: number | null; leaguePoints?: number | null; gross: number | null },
+  f: MatchFormat | null | undefined,
+) {
+  return isPointsFormat(f) ? formatPoints(r, f) : r.gross;
 }

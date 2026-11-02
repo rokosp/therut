@@ -40,7 +40,14 @@ export function playedHoles(
   const slope = tee?.slope ?? null;
 
   if (!course) {
-    return { holes: match.holes, par: match.holes === 18 ? 72 : 36, courseRating: null, slope: null, holePars: null, strokeIndex: null };
+    return {
+      holes: match.holes,
+      par: match.holes === 18 ? 72 : 36,
+      courseRating: null,
+      slope: null,
+      holePars: null,
+      strokeIndex: null,
+    };
   }
 
   if (match.holes === course.holes) {

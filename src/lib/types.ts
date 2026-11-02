@@ -1,8 +1,12 @@
 export type MatchKind = 'major' | 'minor';
 export type TiebreakMode = 'countback' | 'playoff' | 'split';
 export type ScoringBasis = 'gross' | 'net';
-/** Stroke play: fewest strokes wins. Stableford: points per hole against par, most points wins. */
-export type MatchFormat = 'stroke' | 'stableford';
+/**
+ * Stroke play: fewest strokes wins. Stableford: points per hole against par, most points wins.
+ * League rules: each hole gives 1 point to the best score, 2 to second and so on (ties share
+ * the average), and the fewest points over the round wins.
+ */
+export type MatchFormat = 'stroke' | 'stableford' | 'league';
 export type HandicapSource = 'app' | 'self';
 
 export interface BonusType {
