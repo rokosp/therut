@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import {
   addBonus,
@@ -30,11 +30,12 @@ import {
 } from '@/lib/scoring';
 import { matchHappenings, type Happening } from '@/lib/stats';
 import { useAction, useLoad } from '@/lib/useLoad';
-import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, Segmented, T, Tag } from '@/ui/components';
+import { Button, Card, Chip, ErrorText, Field, Row, Screen, Section, T, Tag } from '@/ui/components';
 import { confirmAction } from '@/ui/confirm';
 import { Fireworks } from '@/ui/Fireworks';
 import { PlayerLink } from '@/ui/PlayerLink';
 import { TrashTalk } from '@/ui/TrashTalk';
+import { ScoreEntry } from '@/ui/ScoreEntry';
 import { WeatherLine } from '@/ui/Weather';
 import { WeatherArt } from '@/ui/WeatherArt';
 import { fonts, radius, space, usePalette } from '@/ui/theme';
@@ -122,10 +123,10 @@ export default function MatchScreen() {
   };
   const updatePlayer = (uid: string, patch: Partial<MatchPlayerRow>) => updatePlayers({ [uid]: patch });
 
-  const setHoleScore = (p: MatchPlayerRow, value: number | null) => {
+  const setHoleScore = (p: MatchPlayerRow, h: number, value: number | null) => {
     const scores = [...(p.hole_scores ?? new Array(played.holes).fill(null))];
     while (scores.length < played.holes) scores.push(null);
-    scores[hole] = value;
+    scores[h] = value;
     const complete = scores.every((s) => s != null);
     updatePlayer(p.user_id, {
       hole_scores: scores,
@@ -318,110 +319,52 @@ export default function MatchScreen() {
           </T>
         ) : null}
 
-        {editable ? (
+        {editable && mode === 'holes' ? (
+          <ScoreEntry
+            players={match.match_players.map((p) => ({
+              id: p.user_id,
+              name: nameOf(p.user_id),
+              scores: p.hole_scores ?? [],
+            }))}
+            holes={played.holes}
+            holeOffset={holeOffset}
+            pars={played.holePars}
+            strokeIndex={played.strokeIndex}
+            hole={hole}
+            setHole={setHole}
+            onScore={(uid, h, value) => {
+              const p = match.match_players.find((x) => x.user_id === uid);
+              if (p) setHoleScore(p, h, value);
+            }}
+            holeNote={(uid, value) =>
+              isStableford && parOf(hole) != null
+                ? `${stablefordHole(value, parOf(hole)!)} pts`
+                : match.format === 'league'
+                  ? `${leagueOnHole.get(uid)?.[hole] ?? '–'} pts this hole`
+                  : null
+            }
+            onScan={() => router.push(`/match/${match.id}/scan`)}
+            onTotalsOnly={() => setMode('totals')}
+          />
+        ) : null}
+        {editable && mode === 'totals' ? (
           <Card>
-            <Segmented
-              options={[
-                { value: 'holes', label: 'Hole by hole' },
-                { value: 'totals', label: 'Totals only' },
-              ]}
-              value={mode}
-              onChange={setMode}
-            />
-            {mode === 'holes' ? (
-              <>
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Button title="‹" kind="secondary" compact disabled={hole === 0} onPress={() => setHole(hole - 1)} />
-                  <View style={{ alignItems: 'center' }}>
-                    <T variant="eyebrow" muted>
-                      Hole
-                    </T>
-                    <T variant="score">{hole + 1 + holeOffset}</T>
-                    <T variant="label" muted>
-                      {parOf(hole) != null ? `Par ${parOf(hole)}` : 'Par –'}
-                      {played.strokeIndex ? ` · SI ${played.strokeIndex[hole]}` : ''}
-                    </T>
-                  </View>
-                  <Button
-                    title="›"
-                    kind="secondary"
-                    compact
-                    disabled={hole === played.holes - 1}
-                    onPress={() => setHole(hole + 1)}
-                  />
-                </Row>
-                {match.match_players.map((p) => {
-                  const value = p.hole_scores?.[hole] ?? null;
-                  const par = parOf(hole) ?? 4;
-                  return (
-                    <View key={p.user_id} style={{ gap: space.xs, paddingVertical: space.xs }}>
-                      <Row style={{ justifyContent: 'space-between', minHeight: 56 }}>
-                        <View style={{ flex: 1 }}>
-                          <T style={{ fontFamily: fonts.bodyBold }}>{nameOf(p.user_id)}</T>
-                          {isStableford && value != null && parOf(hole) != null ? (
-                            <T variant="label" muted>
-                              {stablefordHole(value, parOf(hole)!)} pts
-                            </T>
-                          ) : null}
-                          {match.format === 'league' && value != null ? (
-                            <T variant="label" muted>
-                              {leagueOnHole.get(p.user_id)?.[hole] ?? '–'} pts this hole
-                            </T>
-                          ) : null}
-                        </View>
-                        <Stepper
-                          value={value}
-                          par={parOf(hole)}
-                          onMinus={() => setHoleScore(p, value == null ? par : Math.max(1, value - 1))}
-                          onPlus={() => setHoleScore(p, value == null ? par : Math.min(15, value + 1))}
-                          onTap={() => (value == null ? setHoleScore(p, par) : undefined)}
-                          onClear={() => setHoleScore(p, null)}
-                        />
-                      </Row>
-                      {/* One tap for the usual scores. */}
-                      <Row style={{ gap: space.xs }}>
-                        {[par - 1, par, par + 1, par + 2, par + 3]
-                          .filter((n) => n >= 1)
-                          .map((n) => (
-                            <QuickScore
-                              key={n}
-                              n={n}
-                              par={parOf(hole)}
-                              on={value === n}
-                              onPress={() => setHoleScore(p, n)}
-                            />
-                          ))}
-                      </Row>
-                    </View>
-                  );
-                })}
-                {match.match_players.every((p) => p.hole_scores?.[hole] != null) && hole < played.holes - 1 ? (
-                  <Button
-                    title={`Next hole · ${hole + 2 + holeOffset} ›`}
-                    kind="accent"
-                    onPress={() => setHole(hole + 1)}
-                  />
-                ) : null}
-                <T variant="label" muted>
-                  Tap a number, or tap the empty score for par. Long-press a score to clear it.
-                </T>
-              </>
-            ) : (
-              match.match_players.map((p) => (
-                <Field
-                  key={p.user_id}
-                  label={`${nameOf(p.user_id)} total`}
-                  keyboardType="number-pad"
-                  defaultValue={p.gross != null ? String(p.gross) : ''}
-                  onEndEditing={(e) => {
-                    const n = parseInt(e.nativeEvent.text, 10);
-                    updatePlayer(p.user_id, {
-                      gross: Number.isNaN(n) ? null : n,
-                    });
-                  }}
-                />
-              ))
-            )}
+            <T variant="title">Totals only</T>
+            {match.match_players.map((p) => (
+              <Field
+                key={p.user_id}
+                label={`${nameOf(p.user_id)} total`}
+                keyboardType="number-pad"
+                defaultValue={p.gross != null ? String(p.gross) : ''}
+                onEndEditing={(e) => {
+                  const n = parseInt(e.nativeEvent.text, 10);
+                  updatePlayer(p.user_id, {
+                    gross: Number.isNaN(n) ? null : n,
+                  });
+                }}
+              />
+            ))}
+            <Button title="Back to hole by hole" kind="secondary" onPress={() => setMode('holes')} />
           </Card>
         ) : null}
 
@@ -785,66 +728,6 @@ export default function MatchScreen() {
       {/* Fireworks over the whole screen when the match has just been finished. */}
       {celebrate && frame ? <Fireworks width={frame.w} height={frame.h * 0.7} bursts={6} /> : null}
     </View>
-  );
-}
-
-function Stepper({
-  value,
-  par,
-  onMinus,
-  onPlus,
-  onTap,
-  onClear,
-}: {
-  value: number | null;
-  par: number | null;
-  onMinus: () => void;
-  onPlus: () => void;
-  onTap: () => void;
-  onClear: () => void;
-}) {
-  return (
-    <Row>
-      <Button title="−" kind="secondary" compact onPress={onMinus} style={{ width: 52, minHeight: 52 }} />
-      <Pressable onPress={onTap} onLongPress={onClear} style={{ width: 60, alignItems: 'center' }}>
-        <ScoreMark score={value} par={par} size={46} fontSize={26} />
-      </Pressable>
-      <Button title="+" kind="secondary" compact onPress={onPlus} style={{ width: 52, minHeight: 52 }} />
-    </Row>
-  );
-}
-
-const SCORE_NAMES: Record<number, string> = {
-  [-3]: 'Albatross',
-  [-2]: 'Eagle',
-  [-1]: 'Birdie',
-  0: 'Par',
-  1: 'Bogey',
-  2: 'Double',
-  3: 'Triple',
-};
-
-/** A one-tap score button: the number, with birdie/par/bogey underneath. */
-function QuickScore({ n, par, on, onPress }: { n: number; par: number | null; on: boolean; onPress: () => void }) {
-  const c = usePalette();
-  const name = par != null ? (n === 1 ? 'Ace' : SCORE_NAMES[n - par]) : null;
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityLabel={`${n}${name ? `, ${name}` : ''}`}
-      style={{
-        flex: 1,
-        minHeight: 48,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: radius.small,
-        borderWidth: 1,
-        borderColor: on ? c.primary : c.border,
-        backgroundColor: on ? c.primary : 'transparent',
-      }}>
-      <T style={{ fontFamily: fonts.num, fontSize: 20, lineHeight: 22, color: on ? c.onPrimary : c.text }}>{n}</T>
-      {name ? <T style={{ fontSize: 10, lineHeight: 12, color: on ? c.onPrimary : c.muted }}>{name}</T> : null}
-    </Pressable>
   );
 }
 
